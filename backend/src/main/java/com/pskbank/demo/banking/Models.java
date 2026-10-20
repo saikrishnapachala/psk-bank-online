@@ -15,7 +15,11 @@ public final class Models {
     public record Account(String id, String type, String typeLabel, String nickname, String product,
                           String maskedNumber, BigDecimal available, BigDecimal current, BigDecimal rate,
                           String openDate, String maturityDate, String status,
-                          boolean canTransferFrom, boolean canTransferTo, String error) {}
+                          boolean canTransferFrom, boolean canTransferTo, String error,
+                          List<Fact> details, List<Fact> balances) {}
+
+    /** One labelled value straight from the core record. kind = text | money | date | rate. */
+    public record Fact(String label, String value, String kind) {}
 
     public record AccountsView(List<Account> accounts, boolean stale, String asOf, String source, String notice) {}
 
