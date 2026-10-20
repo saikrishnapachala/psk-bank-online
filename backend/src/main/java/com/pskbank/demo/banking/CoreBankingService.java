@@ -7,6 +7,7 @@ import com.pskbank.demo.banking.Models.Txn;
 import com.pskbank.demo.core.ApiException;
 import com.pskbank.demo.core.CircuitBreaker;
 import com.pskbank.demo.core.HttpJson.UpstreamException;
+import com.pskbank.demo.core.Json;
 import com.pskbank.demo.fiserv.EfxMapper;
 import com.pskbank.demo.fiserv.FiservException;
 import com.pskbank.demo.fiserv.FiservPaths;
@@ -43,6 +44,31 @@ public final class CoreBankingService {
 
     public CircuitBreaker breaker() { return breaker; }
 
+    // The shared trial sandbox throttles hard (HTTP 429), so live reads are cached briefly and a 429 falls back
+    // to the last good reply. Mock mode skips this so the outage simulation stays instant.
+    // ponytail: in-memory per process; production = a shared cache with per-user keys and push invalidation.
+    private record Cached(Instant at, Map<String, Object> reply) {}
+    private static final Duration READ_TTL = Duration.ofSeconds(60);
+    private final Map<String, Cached> reads = new ConcurrentHashMap<>();
+
+    private Map<String, Object> read(String path, Map<String, Object> body) {
+        if (!"live".equals(fiserv.mode())) return call(path, body);
+        String key = path + Json.write(body);
+        Cached c = reads.get(key);
+        if (c != null && c.at().plus(READ_TTL).isAfter(Instant.now())) return c.reply();
+        try {
+            Map<String, Object> reply = call(path, body);
+            reads.put(key, new Cached(Instant.now(), reply));
+            return reply;
+        } catch (FiservException e) {
+            if ("429".equals(e.efxCode()) && c != null) return c.reply();
+            throw e;
+        }
+    }
+
+    /** Drop cached reads so the next page shows post-transfer balances. */
+    public void invalidateReads() { reads.clear(); }
+
     /** Call Banking Hub through the breaker. */
     public Map<String, Object> call(String path, Map<String, Object> body) {
         return breaker.call(() -> fiserv.post(path, body));
@@ -55,7 +81,7 @@ public final class CoreBankingService {
             for (AcctRef ref : refs) {
                 futures.add(pool.submit(() -> {
                     try {
-                        return EfxMapper.toAccount(ref, call(FiservPaths.ACCOUNT_INQUIRY, EfxMapper.accountInquiry(ref)));
+                        return EfxMapper.toAccount(ref, read(FiservPaths.ACCOUNT_INQUIRY, EfxMapper.accountInquiry(ref)));
                     } catch (FiservException e) { // business-level: show the row as unavailable with the reason
                         return EfxMapper.unavailable(ref, e.efxDesc() + " (EFX " + e.efxCode() + ")");
                     }
@@ -87,15 +113,17 @@ public final class CoreBankingService {
 
     public Account account(String userId, String opaqueId) {
         AcctRef ref = entitlements.require(userId, opaqueId);
-        return EfxMapper.toAccount(ref, call(FiservPaths.ACCOUNT_INQUIRY, EfxMapper.accountInquiry(ref)));
+        return EfxMapper.toAccount(ref, read(FiservPaths.ACCOUNT_INQUIRY, EfxMapper.accountInquiry(ref)));
     }
 
     public List<Txn> transactions(String userId, String opaqueId, int days) {
         AcctRef ref = entitlements.require(userId, opaqueId);
         int window = Math.max(1, Math.min(days, 365));
         LocalDate to = LocalDate.now();
-        Map<String, Object> reply = call(FiservPaths.TRANSACTION_HISTORY,
+        Map<String, Object> reply = read(FiservPaths.TRANSACTION_HISTORY,
                 EfxMapper.historyInquiry(ref, to.minusDays(window), to, 100));
-        return EfxMapper.toTxns(reply);
+        // The shared sandbox doesn't always honour DtRange, so enforce the window here too.
+        String from = to.minusDays(window).toString();
+        return EfxMapper.toTxns(reply).stream().filter(t -> t.date() == null || t.date().compareTo(from) >= 0).toList();
     }
 }

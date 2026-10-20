@@ -62,6 +62,7 @@ public final class TransferService {
         String summary = "$" + amount.toPlainString() + " from " + from.nickname() + " " + from.masked() + " to " + to.nickname() + " " + to.masked();
         try {
             // Pre-check gives a friendly message; the core re-checks atomically.
+            core.invalidateReads(); // funds check must see the core's current balance
             Account src = core.account(userId, fromId);
             if (src.available() != null && src.available().compareTo(amount) < 0) {
                 throw new ApiException(422, "INSUFFICIENT_FUNDS", "Available balance is $" + src.available().toPlainString());
@@ -72,6 +73,7 @@ public final class TransferService {
             String effDt = Json.str(reply, "XferStatusRec.XferStatus.EffDt");
             TransferResult result = new TransferResult(confirmation("TRF"), "COMPLETED", fromId, toId, amount,
                     effDt != null ? effDt : LocalDate.now().toString(), false, coreStatus);
+            core.invalidateReads();
             idempotency.put(scopedKey, result);
             audit.record(userId, requestId, "INTERNAL_TRANSFER", summary, "COMPLETED", result.confirmation());
             return result;
