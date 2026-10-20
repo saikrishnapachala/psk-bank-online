@@ -71,7 +71,10 @@ public final class LiveFiservTransport implements FiservTransport {
             throw new UpstreamException("Banking Hub returned HTTP " + r.status() + " with a non-JSON body");
         }
         String severity = Json.str(reply, "Status.Severity");
-        if ("Error".equalsIgnoreCase(severity)) {
+        // Premier answers an unknown account with 1120 at Severity=Info; only history may legitimately be empty.
+        boolean notFound = "1120".equals(Json.str(reply, "Status.StatusCode"))
+                && !FiservPaths.TRANSACTION_HISTORY.equals(path);
+        if ("Error".equalsIgnoreCase(severity) || notFound) {
             throw new FiservException(Json.str(reply, "Status.StatusCode"), Json.str(reply, "Status.StatusDesc"),
                     Json.str(reply, "Status.SvcProviderName"));
         }
