@@ -1,5 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
+import { currentRequest, record } from "./trace";
 
 /**
  * The BFF's only outbound dependency: the Java banking service.
@@ -23,7 +24,13 @@ export async function backend<T>(path: string, opts: Options): Promise<T> {
   const base = process.env.BACKEND_URL ?? "http://127.0.0.1:8081";
   const secret = process.env.BACKEND_SHARED_SECRET;
   if (!secret) throw new Error("BACKEND_SHARED_SECRET is not set in web/.env.local");
-  const requestId = opts.requestId ?? randomUUID();
+  const inbound = await currentRequest();
+  const requestId = opts.requestId ?? inbound?.rid ?? randomUUID();
+  const done = (status: number | string) => {
+    if (!inbound) return;
+    inbound.ms = Date.now() - Date.parse(inbound.ts);
+    if (inbound.status !== "render") inbound.status = String(status);
+  };
   const headers: Record<string, string> = {
     "X-Internal-Token": secret,
     "X-User-Id": opts.userId,
@@ -43,8 +50,11 @@ export async function backend<T>(path: string, opts: Options): Promise<T> {
       signal: AbortSignal.timeout(20_000),
     });
   } catch {
+    done(503);
+    record({ ts: new Date().toISOString(), rid: requestId, hop: "bff-java", method: opts.method ?? "GET", target: path, status: "DOWN", ms: 0, detail: "Java service unreachable" });
     throw new BackendError(503, "BACKEND_UNREACHABLE", "The banking service isn't reachable. Is the Java backend running on " + base + "?", requestId);
   }
+  done(res.status);
   const text = await res.text();
   const json = text ? JSON.parse(text) : {};
   if (!res.ok) {
