@@ -5,9 +5,26 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { backend, BackendError } from "@/lib/backend";
 import { date, money, rate } from "@/lib/format";
 import { requireSession } from "@/lib/session";
-import type { Account, Txn } from "@/lib/types";
+import { pastDue, type Account, type Fact, type Txn } from "@/lib/types";
 
 const WINDOWS = [30, 60, 90];
+
+function show(f: Fact) {
+  if (f.kind === "money") return money(Number(f.value));
+  if (f.kind === "date") return date(f.value);
+  if (f.kind === "rate") return `${Number(f.value).toFixed(2)}%`;
+  return f.value.replace(/([a-z])([A-Z])/g, "$1 $2"); // Fiserv enums: PrincipalAndInterest
+}
+
+function Facts({ items }: { items: Fact[] }) {
+  return (
+    <dl className="facts">
+      {items.map((f) => (
+        <div key={f.label}><dt>{f.label}</dt><dd>{show(f)}</dd></div>
+      ))}
+    </dl>
+  );
+}
 
 export default async function AccountPage({
   params,
@@ -45,13 +62,36 @@ export default async function AccountPage({
             <p className="greeting">{account.typeLabel} {account.maskedNumber}</p>
             <h1 className="headline" style={{ marginBottom: 12 }}>
               {account.nickname}
-              <Money value={loan ? account.current : account.available ?? account.current} />
+              <Money value={loan || account.type === "CDA" ? account.current : account.available ?? account.current} />
             </h1>
             <p className="muted" style={{ marginTop: 0 }}>
-              {loan ? "Principal balance" : `Available. Current balance ${money(account.current)}.`}{" "}
+              {loan ? "Principal balance." : account.type === "CDA" ? "Current balance." : `Available. Current balance ${money(account.current)}.`}{" "}
               {rate(account.rate) && `${rate(account.rate)}.`}{" "}
               {account.maturityDate && `${loan ? "Final payment" : "Matures"} ${date(account.maturityDate)}.`}
             </p>
+            {loan && pastDue(account) > 0 && (
+              <p className="notice bad" role="status">
+                This loan shows {money(pastDue(account))} past due in the core system.
+              </p>
+            )}
+            {(account.canTransferFrom || account.canTransferTo) && (
+              <p><Link href="/move-money" className="btn quiet">{loan ? "Make a payment" : "Transfer money"}</Link></p>
+            )}
+
+            {!!account.details?.length && (
+              <section className="section" aria-labelledby="details">
+                <h2 id="details">Account details</h2>
+                <div className="ledger"><Facts items={account.details} /></div>
+              </section>
+            )}
+
+            {!!account.balances?.length && (
+              <section className="section" aria-labelledby="balances">
+                <h2 id="balances">Balances</h2>
+                <p className="small muted" style={{ marginTop: 0 }}>Every non-zero balance the core reports for this account.</p>
+                <div className="ledger"><Facts items={account.balances} /></div>
+              </section>
+            )}
 
             <section className="section" aria-labelledby="history">
               <div className="section-head">

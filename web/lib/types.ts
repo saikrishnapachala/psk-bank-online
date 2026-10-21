@@ -14,7 +14,16 @@ export type Account = {
   canTransferFrom: boolean;
   canTransferTo: boolean;
   error?: string;
+  details?: Fact[];
+  balances?: Fact[];
 };
+
+/** A labelled value straight from the Fiserv record. */
+export type Fact = { label: string; value: string; kind: "text" | "money" | "date" | "rate" };
+
+export function pastDue(a: Account): number {
+  return Number(a.balances?.find((b) => b.label === "Past due")?.value ?? 0);
+}
 
 export type AccountsView = { accounts: Account[]; stale: boolean; asOf: string; source: string; notice?: string };
 
