@@ -94,6 +94,7 @@ public final class App {
         r.get("/api/activity", q -> obj("events", audit.recent(q.userId(), 20)));
 
         // ---- dev tools ----
+        r.get("/api/dev/trace", q -> obj("events", com.pskbank.demo.core.Trace.snapshot()));
         r.get("/api/dev/status", q -> obj("fiserv", fiserv.mode(), "plaid", plaidTransport.mode(),
                 "circuitOpen", core.breaker().isOpen(),
                 "mockOutage", fiserv instanceof MockFiservTransport m && m.outage()));

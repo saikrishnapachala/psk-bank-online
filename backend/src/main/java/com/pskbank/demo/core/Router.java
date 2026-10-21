@@ -56,7 +56,9 @@ public final class Router implements HttpHandler {
     @Override
     public void handle(HttpExchange ex) throws IOException {
         long start = System.nanoTime();
+        java.time.Instant startedAt = java.time.Instant.now();
         String requestId = headerOr(ex, "X-Request-Id", UUID.randomUUID().toString());
+        Trace.RID.set(requestId);
         String method = ex.getRequestMethod();
         String path = ex.getRequestURI().getPath();
         int status = 200;
@@ -101,6 +103,10 @@ public final class Router implements HttpHandler {
         try (OutputStream os = ex.getResponseBody()) { os.write(bytes); }
         long ms = (System.nanoTime() - start) / 1_000_000;
         System.out.printf("%s %s %s -> %d (%d ms) rid=%s%n", java.time.LocalTime.now().withNano(0), method, path, status, ms, requestId);
+        if (!path.equals("/health") && !path.equals("/api/dev/trace")) {
+            Trace.record(startedAt, "bff-java", method, path, String.valueOf(status), null);
+        }
+        Trace.RID.remove();
     }
 
     private static Map<String, Object> readBody(HttpExchange ex) throws IOException {

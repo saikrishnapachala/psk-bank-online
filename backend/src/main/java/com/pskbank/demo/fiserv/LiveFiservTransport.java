@@ -107,8 +107,11 @@ public final class LiveFiservTransport implements FiservTransport {
         if (token != null && Instant.now().isBefore(tokenExpiresAt.minusSeconds(60))) return token;
         synchronized (this) {
             if (token != null && Instant.now().isBefore(tokenExpiresAt.minusSeconds(60))) return token;
+            Instant t0 = Instant.now();
             HttpJson.Result r = HttpJson.post(tokenUrl, Map.of("Authorization", basicAuth),
                     "grant_type=client_credentials", "application/x-www-form-urlencoded", timeout);
+            com.pskbank.demo.core.Trace.record(t0, "java-fiserv", "POST", "/fts-apim/oauth2/v2", "HTTP " + r.status(),
+                    r.ok() ? "OAuth token issued (cached ~15 min)" : "Token request rejected");
             if (!r.ok()) {
                 throw new FiservException("TOKEN_" + r.status(),
                         "Token request rejected. Check FISERV_API_KEY / FISERV_API_SECRET and FISERV_TOKEN_URL.", null);

@@ -38,8 +38,20 @@ public final class PlaidService {
 
     public String mode() { return plaid.mode(); }
 
+    private Map<String, Object> call(String path, Map<String, Object> body) {
+        java.time.Instant t0 = java.time.Instant.now();
+        try {
+            Map<String, Object> reply = plaid.post(path, body);
+            com.pskbank.demo.core.Trace.record(t0, "java-plaid", "POST", path, "OK", plaid.mode());
+            return reply;
+        } catch (RuntimeException e) {
+            com.pskbank.demo.core.Trace.record(t0, "java-plaid", "POST", path, "ERROR", e.getMessage() + " · " + plaid.mode());
+            throw e;
+        }
+    }
+
     public Map<String, Object> linkToken(String userId) {
-        Map<String, Object> reply = plaid.post("/link/token/create", obj(
+        Map<String, Object> reply = call("/link/token/create", obj(
                 "client_name", clientName,
                 "language", "en",
                 "country_codes", List.of("US"),
@@ -51,7 +63,7 @@ public final class PlaidService {
     /** Called after Plaid Link's onSuccess hands the browser a public_token. */
     public LinkedItem exchange(String userId, String publicToken, String institutionName) {
         if (publicToken == null || publicToken.isBlank()) throw ApiException.badRequest("publicToken is required");
-        Map<String, Object> reply = plaid.post("/item/public_token/exchange", obj("public_token", publicToken));
+        Map<String, Object> reply = call("/item/public_token/exchange", obj("public_token", publicToken));
         Item item = new Item(Json.str(reply, "item_id"), Json.str(reply, "access_token"),
                 institutionName == null || institutionName.isBlank() ? "Linked bank" : institutionName);
         itemsByUser.computeIfAbsent(userId, k -> new ConcurrentHashMap<>()).put(item.itemId(), item);
@@ -61,7 +73,7 @@ public final class PlaidService {
 
     /** Dev shortcut that works in mock AND real Plaid Sandbox: creates a public_token without the Link UI. */
     public LinkedItem sandboxLink(String userId) {
-        Map<String, Object> reply = plaid.post("/sandbox/public_token/create", obj(
+        Map<String, Object> reply = call("/sandbox/public_token/create", obj(
                 "institution_id", "ins_109508", // First Platypus Bank (Plaid Sandbox)
                 "initial_products", List.of("auth")));
         return exchange(userId, Json.str(reply, "public_token"), "First Platypus Bank");
@@ -70,7 +82,7 @@ public final class PlaidService {
     public List<ExternalAccount> accounts(String userId) {
         List<ExternalAccount> out = new ArrayList<>();
         for (Item item : itemsByUser.getOrDefault(userId, Map.of()).values()) {
-            Map<String, Object> reply = plaid.post("/accounts/balance/get", obj("access_token", item.accessToken()));
+            Map<String, Object> reply = call("/accounts/balance/get", obj("access_token", item.accessToken()));
             for (Object a : Json.list(reply, "accounts")) {
                 String plaidId = Json.str(a, "account_id");
                 String extId = "ext-" + shortHash(item.itemId() + "|" + plaidId);
@@ -93,7 +105,7 @@ public final class PlaidService {
     public String[] achNumbers(String userId, String extId) {
         ExtRef ref = ref(userId, extId);
         Item item = itemsByUser.get(userId).get(ref.itemId());
-        Map<String, Object> reply = plaid.post("/auth/get", obj("access_token", item.accessToken(),
+        Map<String, Object> reply = call("/auth/get", obj("access_token", item.accessToken(),
                 "options", obj("account_ids", List.of(ref.plaidAccountId()))));
         for (Object n : Json.list(reply, "numbers.ach")) {
             if (ref.plaidAccountId().equals(Json.str(n, "account_id"))) {
@@ -116,7 +128,7 @@ public final class PlaidService {
     public void unlink(String userId, String itemId) {
         Item item = itemsByUser.getOrDefault(userId, Map.of()).get(itemId);
         if (item == null) throw ApiException.notFound("Linked bank not found");
-        plaid.post("/item/remove", obj("access_token", item.accessToken()));
+        call("/item/remove", obj("access_token", item.accessToken()));
         itemsByUser.get(userId).remove(itemId);
         Map<String, ExtRef> ext = extByUser.get(userId);
         if (ext != null) ext.values().removeIf(r -> r.itemId().equals(itemId));

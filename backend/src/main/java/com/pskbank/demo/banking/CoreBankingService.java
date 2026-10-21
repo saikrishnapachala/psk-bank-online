@@ -8,6 +8,7 @@ import com.pskbank.demo.core.ApiException;
 import com.pskbank.demo.core.CircuitBreaker;
 import com.pskbank.demo.core.HttpJson.UpstreamException;
 import com.pskbank.demo.core.Json;
+import com.pskbank.demo.core.Trace;
 import com.pskbank.demo.fiserv.EfxMapper;
 import com.pskbank.demo.fiserv.FiservException;
 import com.pskbank.demo.fiserv.FiservPaths;
@@ -55,13 +56,19 @@ public final class CoreBankingService {
         if (!"live".equals(fiserv.mode())) return call(path, body);
         String key = path + Json.write(body);
         Cached c = reads.get(key);
-        if (c != null && c.at().plus(READ_TTL).isAfter(Instant.now())) return c.reply();
+        if (c != null && c.at().plus(READ_TTL).isAfter(Instant.now())) {
+            Trace.record(Instant.now(), "java-fiserv", "POST", path, "cache", "Served from 60s read cache, no Fiserv call");
+            return c.reply();
+        }
         try {
             Map<String, Object> reply = call(path, body);
             reads.put(key, new Cached(Instant.now(), reply));
             return reply;
         } catch (FiservException e) {
-            if ("429".equals(e.efxCode()) && c != null) return c.reply();
+            if ("429".equals(e.efxCode()) && c != null) {
+                Trace.record(Instant.now(), "java-fiserv", "POST", path, "cache", "Rate limited (429), served last good reply");
+                return c.reply();
+            }
             throw e;
         }
     }
@@ -71,7 +78,19 @@ public final class CoreBankingService {
 
     /** Call Banking Hub through the breaker. */
     public Map<String, Object> call(String path, Map<String, Object> body) {
-        return breaker.call(() -> fiserv.post(path, body));
+        Instant t0 = Instant.now();
+        try {
+            Map<String, Object> reply = breaker.call(() -> fiserv.post(path, body));
+            Trace.record(t0, "java-fiserv", "POST", path, "EFX " + Json.str(reply, "Status.StatusCode"),
+                    Json.str(reply, "Status.StatusDesc") + " · " + fiserv.mode() + " · " + Json.str(reply, "Status.SvcProviderName"));
+            return reply;
+        } catch (FiservException e) {
+            Trace.record(t0, "java-fiserv", "POST", path, "EFX " + e.efxCode(), e.efxDesc() + " · " + fiserv.mode());
+            throw e;
+        } catch (RuntimeException e) {
+            Trace.record(t0, "java-fiserv", "POST", path, "ERROR", e.getMessage() + " · " + fiserv.mode());
+            throw e;
+        }
     }
 
     public AccountsView accounts(String userId) {
