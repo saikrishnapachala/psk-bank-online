@@ -7,7 +7,7 @@ import { UnlinkButton } from "@/components/UnlinkButton";
 import { backend, BackendError } from "@/lib/backend";
 import { date, money, rate } from "@/lib/format";
 import { requireSession } from "@/lib/session";
-import type { Account, AccountsView, AuditEvent, ExternalAccount, LinkedItem } from "@/lib/types";
+import { pastDue, type Account, type AccountsView, type AuditEvent, type ExternalAccount, type LinkedItem } from "@/lib/types";
 
 function greeting() {
   const h = new Date().getHours();
@@ -25,17 +25,25 @@ function AccountRow({ a }: { a: Account }) {
     );
   }
   const loan = a.type === "LOAN";
+  const cd = a.type === "CDA";
   const meta = a.type === "CDA"
     ? `${rate(a.rate)}, matures ${date(a.maturityDate)}`
     : loan ? `${rate(a.rate)}, opened ${date(a.openDate)}` : rate(a.rate);
   return (
     <Link href={`/accounts/${a.id}`} className="row">
-      <div><div className="name">{a.nickname}</div><div className="sub">{a.typeLabel} {a.maskedNumber}</div></div>
+      <div>
+        <div className="name">
+          {a.nickname}
+          {a.status && !["Active", "Open", "Valid"].includes(a.status) && <span className="tag">{a.status}</span>}
+          {pastDue(a) > 0 && <span className="tag bad">{money(pastDue(a))} past due</span>}
+        </div>
+        <div className="sub">{a.product && !/^\d+$/.test(a.product) ? `${a.product} · ` : ""}{a.typeLabel} {a.maskedNumber}</div>
+      </div>
       <div className="meta sub">{meta}</div>
       <div className="amount">
-        <Money value={loan ? a.current : a.available ?? a.current} />
+        <Money value={loan || cd ? a.current : a.available ?? a.current} />
         <div className="sub">
-          {loan ? "principal balance" : a.available !== undefined && a.current !== undefined && a.available !== a.current
+          {loan ? "principal balance" : cd ? "current balance" : a.available !== undefined && a.current !== undefined && a.available !== a.current
             ? `${money(a.current)} current` : "available"}
         </div>
       </div>
@@ -55,7 +63,7 @@ export default async function Dashboard() {
   const accountsError = acc.status === "rejected" ? (acc.reason as BackendError).message : null;
   const deposits = view?.accounts.filter((a) => a.type !== "LOAN") ?? [];
   const loans = view?.accounts.filter((a) => a.type === "LOAN") ?? [];
-  const total = deposits.reduce((s, a) => s + (a.available ?? a.current ?? 0), 0);
+  const total = deposits.reduce((s, a) => s + ((a.type === "CDA" ? a.current : a.available ?? a.current) ?? 0), 0);
   const externals = ext.status === "fulfilled" ? ext.value : null;
   const events = act.status === "fulfilled" ? act.value.events : [];
 
@@ -73,7 +81,7 @@ export default async function Dashboard() {
         <p className="greeting">{greeting()}, {session.name.split(" ")[0]}.</p>
         {view && (
           <h1 className="headline">
-            You have <Money value={total} /> available across {deposits.length} deposit{" "}
+            You have <Money value={total} /> across {deposits.length} deposit{" "}
             {deposits.length === 1 ? "account" : "accounts"}.
           </h1>
         )}
