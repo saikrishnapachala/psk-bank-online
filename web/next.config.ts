@@ -19,6 +19,8 @@ const csp = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Dev only: lets a second computer on the same Wi-Fi open http://<this-mac-ip>:3000 for the two-customer demo.
+  allowedDevOrigins: ["192.168.*.*", "10.*.*.*", "*.local"],
   async headers() {
     const headers = [
       { key: "X-Content-Type-Options", value: "nosniff" },
