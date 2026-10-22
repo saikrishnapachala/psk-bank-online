@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { DataPath } from "@/components/DataPath";
+import { AutoRefresh } from "@/components/AutoRefresh";
 import { LinkBankButton } from "@/components/LinkBankButton";
 import { Money } from "@/components/Money";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -8,6 +8,13 @@ import { backend, BackendError } from "@/lib/backend";
 import { date, money, rate } from "@/lib/format";
 import { requireSession } from "@/lib/session";
 import { pastDue, type Account, type AccountsView, type AuditEvent, type ExternalAccount, type LinkedItem } from "@/lib/types";
+
+const ACTIVITY: Record<string, string> = {
+  INTERNAL_TRANSFER: "Transfer between your accounts",
+  MEMBER_TRANSFER: "Sent to a PSK Bank customer",
+  MEMBER_RECEIVED: "Received from a PSK Bank customer",
+  EXTERNAL_FUNDING: "Transfer from another bank",
+};
 
 function greeting() {
   const h = new Date().getHours();
@@ -30,7 +37,7 @@ function AccountRow({ a }: { a: Account }) {
     ? `${rate(a.rate)}, matures ${date(a.maturityDate)}`
     : loan ? `${rate(a.rate)}, opened ${date(a.openDate)}` : rate(a.rate);
   return (
-    <Link href={`/accounts/${a.id}`} className="row">
+    <Link href={`/accounts/${a.id}`} className={`row type-${a.type}`}>
       <div>
         <div className="name">
           {a.nickname}
@@ -70,6 +77,7 @@ export default async function Dashboard() {
   return (
     <>
       <SiteHeader name={session.name} current="accounts" />
+      <AutoRefresh />
       <main className="wrap">
         {view?.stale && (
           <p className="notice warn" role="status">
@@ -78,19 +86,32 @@ export default async function Dashboard() {
         )}
         {accountsError && <p className="notice bad" role="alert">{accountsError}</p>}
 
-        <p className="greeting">{greeting()}, {session.name.split(" ")[0]}.</p>
-        {view && (
-          <h1 className="headline">
-            You have <Money value={total} /> across {deposits.length} deposit{" "}
-            {deposits.length === 1 ? "account" : "accounts"}.
-          </h1>
-        )}
+        <section className="hero" aria-labelledby="hero-title">
+          <div className="hero-body">
+            <p className="hero-greet">{greeting()}, {session.name.split(" ")[0]}</p>
+            <h1 id="hero-title" className="hero-title">
+              <span>Total balance</span>
+              {view ? <Money value={total} /> : <span className="fig">—</span>}
+            </h1>
+            {view && (
+              <p className="hero-sub">
+                Across {deposits.length} deposit {deposits.length === 1 ? "account" : "accounts"}
+                {loans.length > 0 && <>, plus {loans.length} home {loans.length === 1 ? "loan" : "loans"}</>}.
+                Balances come live from the Fiserv core.
+              </p>
+            )}
+          </div>
+          <nav className="quick" aria-label="Quick actions">
+            <Link href="/move-money" className="btn">Transfer money</Link>
+            {loans.length > 0 && <Link href="/move-money" className="btn ghost">Pay home loan</Link>}
+            <a href="#external" className="btn ghost">Link a bank</a>
+          </nav>
+        </section>
 
         {view && (
           <section aria-labelledby="deposits">
             <div className="section-head">
-              <h2 id="deposits">Savings and CDs</h2>
-              <Link href="/move-money" className="btn quiet">Move money</Link>
+              <h2 id="deposits">Your accounts</h2>
             </div>
             <div className="ledger">
               {deposits.map((a) => <AccountRow key={a.id} a={a} />)}
@@ -140,17 +161,18 @@ export default async function Dashboard() {
         <section className="section" aria-labelledby="activity">
           <h2 id="activity">Recent money movement</h2>
           <div className="ledger">
-            {events.length === 0 && <p className="empty">Transfers you make in this session show up here.</p>}
+            {events.length === 0 && <p className="empty">Money you send or receive shows up here.</p>}
             {events.map((e, i) => (
               <div className="row" key={i}>
                 <div>
-                  <div className="name">{e.type === "INTERNAL_TRANSFER" ? "Transfer between accounts" : "Transfer from another bank"}</div>
+                  <div className="name">{ACTIVITY[e.type] ?? e.type}</div>
                   <div className="sub">{e.summary}</div>
                 </div>
                 <div className="meta sub">{new Date(e.ts).toLocaleString("en-US")}</div>
                 <div className="amount">
-                  <span className={`tag ${e.status === "COMPLETED" ? "ok" : e.status.startsWith("PENDING") ? "" : "bad"}`}>
-                    {e.status === "COMPLETED" ? "Completed" : e.status.startsWith("PENDING") ? "Pending ACH" : "Not sent"}
+                  <span className={`tag ${e.status === "COMPLETED" ? "ok" : e.status.startsWith("PENDING") || e.status.startsWith("UNKNOWN") ? "" : "bad"}`}>
+                    {e.status === "COMPLETED" ? (e.type === "MEMBER_RECEIVED" ? "Received" : "Completed")
+                      : e.status.startsWith("PENDING") ? "Pending ACH" : e.status.startsWith("UNKNOWN") ? "Unconfirmed" : "Not sent"}
                   </span>
                   {e.ref && <div className="sub">{e.ref}</div>}
                 </div>
@@ -159,7 +181,6 @@ export default async function Dashboard() {
           </div>
         </section>
       </main>
-      <DataPath />
     </>
   );
 }

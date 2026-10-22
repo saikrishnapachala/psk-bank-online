@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { DataPath } from "@/components/DataPath";
+import { AutoRefresh } from "@/components/AutoRefresh";
 import { Money } from "@/components/Money";
 import { SiteHeader } from "@/components/SiteHeader";
 import { backend, BackendError } from "@/lib/backend";
@@ -54,6 +54,7 @@ export default async function AccountPage({
   return (
     <>
       <SiteHeader name={session.name} current="accounts" />
+      <AutoRefresh />
       <main className="wrap">
         <p className="small"><Link href="/">All accounts</Link></p>
         {error && <p className="notice bad" role="alert">{error}</p>}
@@ -129,7 +130,6 @@ export default async function AccountPage({
           </>
         )}
       </main>
-      <DataPath />
     </>
   );
 }

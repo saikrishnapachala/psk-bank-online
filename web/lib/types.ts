@@ -48,6 +48,9 @@ export type ExternalAccount = {
   current?: number;
 };
 
+/** Another PSK Bank customer you can send to; account is masked ("Checking ••7791"). */
+export type Payee = { id: string; name: string; account: string };
+
 export type LinkedItem = { itemId: string; institution: string; accountCount: number };
 
 export type AuditEvent = { ts: string; type: string; summary: string; status: string; ref?: string };
