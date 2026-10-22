@@ -41,6 +41,19 @@ Try these:
 3. Open an account to see its transaction history (Fiserv Account Transaction History).
 4. **Simulate Fiserv outage** in the footer. You get cached balances, a clear banner, transfers paused and the circuit open. End it to recover.
 
+## Deploy free on Render
+
+`render.yaml` defines both services (free plan): `psk-bank-api` (Java, Docker) and `psk-bank-online` (Next.js).
+
+1. Push this repo to GitHub.
+2. In Render: **New → Blueprint**, pick the repo, then fill in the values it asks for:
+   `FISERV_API_KEY`, `FISERV_API_SECRET`, `DEMO_PASSWORD`, and `BACKEND_URL` (the API service's URL, e.g. `https://psk-bank-api.onrender.com`).
+   The shared secret and session secret are generated for you.
+3. Open the `psk-bank-online` URL and sign in as `alex`, `jordan` or `sam`.
+
+Free services sleep after about 15 minutes idle; the first visit after that takes 30–60 seconds while both wake up.
+Open the site a minute before a demo. In-memory data (logs, activity, rate limits) resets when they sleep.
+
 ## Switch Fiserv to live (your Developer Studio workspace)
 
 1. In Developer Studio, open **Workspaces → your Banking Hub workspace → Credentials**. Copy the **API key**, **API secret**, **Org ID** and **Host URL**.

@@ -16,14 +16,16 @@ function lanUrls(): string[] {
 export function TestAccountsTab({ customers, error }: { customers: Customer[]; error: string | null }) {
   const users = demoUsers();
   const password = process.env.DEMO_PASSWORD ?? "(not set)";
-  const urls = lanUrls();
+  // Hosted (Render sets RENDER_EXTERNAL_URL): one public link. On a Mac: its Wi-Fi addresses.
+  const publicUrl = process.env.PUBLIC_URL ?? process.env.RENDER_EXTERNAL_URL;
+  const urls = publicUrl ? [publicUrl] : lanUrls();
 
   return (
     <div className="doc">
       <h2>Run the team demo on three laptops</h2>
       <ol className="steps">
         <li>
-          Keep the laptops on the same Wi-Fi as this Mac and open{" "}
+          {publicUrl ? "On each laptop, open" : "Keep the laptops on the same Wi-Fi as this Mac and open"}{" "}
           {urls.length ? urls.map((u, i) => <span key={u}>{i > 0 && " or "}<code>{u}</code></span>) : <code>http://&lt;this Mac&apos;s IP&gt;:3000</code>}.
         </li>
         <li>Sign in as a different customer on each laptop, using the usernames below.</li>

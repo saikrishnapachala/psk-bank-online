@@ -1,0 +1,76 @@
+# Render Blueprint: Dashboard > New > Blueprint > pick this repo. Creates two free web services.
+# Secrets marked `sync: false` are asked for once in the dashboard and never stored in Git.
+services:
+  # Java banking service: the only component that holds Fiserv credentials.
+  - type: web
+    name: psk-bank-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    envVars:
+      - key: BFF_SHARED_SECRET
+        generateValue: true
+      - key: FISERV_MODE
+        value: live
+      - key: FISERV_API_KEY
+        sync: false
+      - key: FISERV_API_SECRET
+        sync: false
+      - key: FISERV_ORG_ID
+        value: "999990301"
+      - key: FISERV_HOST_URL
+        value: https://bankinghub-cert.fiservapis.com/banking/efx/v1
+      - key: FISERV_TOKEN_URL
+        value: https://bankinghub-cert.fiservapis.com/fts-apim/oauth2/v2
+      - key: FISERV_CHANNEL
+        value: WEB
+      - key: FISERV_CLIENT_APP_NAME
+        value: PSK-Bank-Online-Demo
+      - key: PLAID_MODE
+        value: mock
+      # Demo customers and their accounts in the shared Banking Hub Premier sandbox (public sample accounts).
+      - key: DEMO_USERS
+        value: u-alex:Alex Morgan,u-jordan:Jordan Lee,u-sam:Sam Patel
+      - key: ACCOUNTS_U_ALEX
+        value: DDA:1081372605:Everyday Checking;SDA:8282801916:Money Market;CDA:1082998135:12-Month CD
+      - key: ACCOUNTS_U_JORDAN
+        value: DDA:1082607791:Everyday Checking;SDA:1082000518:High-Yield Savings;CDA:1082063060:6-Month CD
+      - key: ACCOUNTS_U_SAM
+        value: DDA:1082073267:Everyday Checking;DDA:1082044258:Bills Checking;CDA:290001702:3-Month CD
+      - key: TRANSFER_LIMIT_USD
+        value: "25000"
+      - key: MEMBER_TRANSFER_LIMIT_USD
+        value: "5000"
+      - key: MEMBER_DAILY_LIMIT_USD
+        value: "10000"
+      - key: TRANSFERS_PER_MINUTE
+        value: "6"
+
+  # Next.js UI + BFF: holds the session secret only, no banking credentials.
+  - type: web
+    name: psk-bank-online
+    runtime: node
+    plan: free
+    rootDir: web
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /login
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # The API service's public URL, e.g. https://psk-bank-api.onrender.com (shown on its dashboard page).
+      - key: BACKEND_URL
+        sync: false
+      - key: BACKEND_SHARED_SECRET
+        fromService:
+          type: web
+          name: psk-bank-api
+          envVarKey: BFF_SHARED_SECRET
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: DEMO_PASSWORD
+        sync: false
+      - key: DEMO_USERS
+        value: alex:u-alex:Alex Morgan,jordan:u-jordan:Jordan Lee,sam:u-sam:Sam Patel
