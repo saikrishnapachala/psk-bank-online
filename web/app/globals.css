@@ -1,7 +1,7 @@
 @import "@fontsource-variable/archivo/wdth.css";
 
 :root {
-  /* Palette after toyota.com: signal red, true black, graphite, silver, mist, white. */
+  /* Palette: signal red, true black, graphite, silver, mist, white. */
   --paper: #f2f2f2;
   --surface: #ffffff;
   --ink: #000000;
