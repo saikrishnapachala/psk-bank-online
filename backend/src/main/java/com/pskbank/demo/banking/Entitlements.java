@@ -34,7 +34,10 @@ public final class Entitlements {
         for (String u : users.split(",")) {
             String[] f = u.trim().split(":", 2);
             if (f[0].isBlank()) continue;
-            e.add(f[0], f.length == 2 ? f[1].trim() : f[0], cfg.require("ACCOUNTS_" + f[0]));
+            // ACCOUNTS_u-alex, or ACCOUNTS_U_ALEX for hosts whose env var names can't contain "-".
+            String envSafe = "ACCOUNTS_" + f[0].toUpperCase().replace('-', '_');
+            String spec = cfg.get("ACCOUNTS_" + f[0], null);
+            e.add(f[0], f.length == 2 ? f[1].trim() : f[0], spec != null ? spec : cfg.require(envSafe));
         }
         return e;
     }

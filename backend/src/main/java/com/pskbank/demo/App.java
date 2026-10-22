@@ -69,7 +69,13 @@ public final class App {
         ExternalFundingService funding = new ExternalFundingService(plaid, entitlements, audit, cfg.getDecimal("ACH_FUNDING_LIMIT_USD", "10000"));
 
         String secret = cfg.get("BFF_SHARED_SECRET", "dev-only-change-me");
-        if (secret.equals("dev-only-change-me")) System.out.println("WARN using default BFF_SHARED_SECRET; set your own in backend/.env");
+        if (secret.equals("dev-only-change-me")) {
+            if (!cfg.get("BIND_HOST", "127.0.0.1").equals("127.0.0.1")) {
+                System.err.println("Refusing to start: BIND_HOST exposes the service but BFF_SHARED_SECRET is the default.");
+                System.exit(1);
+            }
+            System.out.println("WARN using default BFF_SHARED_SECRET; set your own in backend/.env");
+        }
 
         Router r = new Router(secret, App::mapError);
         r.publicGet("/health", q -> obj("status", "ok", "fiserv", fiserv.mode(), "plaid", plaidTransport.mode(),
