@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { SignOutButton } from "./SignOutButton";
 
-export function SiteHeader({ name, current }: { name: string; current: "accounts" | "move-money" }) {
+export function SiteHeader({ name, current }: { name: string; current: "accounts" | "move-money" | "logs" }) {
   return (
     <header className="site-header">
       <div className="wrap">
@@ -11,6 +11,7 @@ export function SiteHeader({ name, current }: { name: string; current: "accounts
         <nav className="nav" aria-label="Main">
           <Link href="/" aria-current={current === "accounts" ? "page" : undefined}>Accounts</Link>
           <Link href="/move-money" aria-current={current === "move-money" ? "page" : undefined}>Move money</Link>
+          <Link href="/logs" aria-current={current === "logs" ? "page" : undefined}>Logs</Link>
         </nav>
         <div className="who">
           <span>{name}</span>

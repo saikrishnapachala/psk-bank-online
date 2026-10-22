@@ -167,3 +167,16 @@ label.field input.amount { font-stretch: 80%; font-size: 22px; font-variant-nume
 .facts > div { padding: 14px 18px; border-top: 1px solid var(--line); margin-top: -1px; }
 .facts dt { color: var(--steel); font-size: 13px; }
 .facts dd { margin: 2px 0 0; font-weight: 560; font-variant-numeric: tabular-nums; }
+
+/* request log observer */
+.trace { margin-top: 20px; }
+.trace > header { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: baseline; margin: 0 4px 8px; }
+.trace .txns td { font-size: 14px; vertical-align: top; }
+.trace .txns tr:first-child td { border-top: 0; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; word-break: break-all; }
+.hop { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 6px; white-space: nowrap; background: #eef1f4; color: var(--ink); }
+.hop-bff-java { background: #e8eefb; color: #1f3f8a; }
+.hop-java-fiserv { background: #fbeaec; color: var(--bad); }
+.hop-java-plaid { background: #eef7f1; color: var(--ok); }
+.tag.cache { background: #eef1f4; color: var(--steel); }
+@media (max-width: 720px) { .trace .txns td:nth-child(5) { display: none; } }
