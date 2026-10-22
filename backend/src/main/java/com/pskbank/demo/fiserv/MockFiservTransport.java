@@ -55,6 +55,12 @@ public final class MockFiservTransport implements FiservTransport {
                 today.minusMonths(7), today.minusMonths(7).plusMonths(12)));
         add(new Acct("7300098765", "LOAN", "MTG30", "Residential Mortgage", "312480.19", "0", "6.125",
                 today.minusYears(2), today.minusYears(2).plusYears(30)));
+        add(new Acct("4100011111", "DDA", "CHK", "Personal Checking", "8240.12", "0", "0.10",
+                today.minusYears(4), null));
+        add(new Acct("4100022222", "DDA", "CHK", "Personal Checking", "3115.40", "0", "0.10",
+                today.minusYears(2), null));
+        add(new Acct("4100033333", "DDA", "CHK", "Personal Checking", "1960.75", "0", "0.10",
+                today.minusYears(1), null));
         seedHistory(today);
     }
 

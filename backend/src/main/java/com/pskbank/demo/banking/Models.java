@@ -29,6 +29,9 @@ public final class Models {
     public record TransferResult(String confirmation, String status, String fromId, String toId, BigDecimal amount,
                                  String effectiveDate, boolean replayed, String coreStatusCode) {}
 
+    /** Another PSK Bank customer the user can send to. The real account number never leaves Java. */
+    public record Payee(String id, String name, String account) {}
+
     public record ExternalAccount(String id, String itemId, String institution, String name, String mask,
                                   String subtype, BigDecimal available, BigDecimal current) {}
 

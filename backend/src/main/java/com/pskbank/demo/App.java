@@ -51,19 +51,20 @@ public final class App {
     public static void main(String[] args) throws Exception {
         System.setOut(new PrintStream(new FileOutputStream(FileDescriptor.out), true, StandardCharsets.UTF_8));
         Config cfg = Config.load(Path.of(".env"));
-        String userId = cfg.get("DEMO_USER_ID", "u-alex");
 
         FiservTransport fiserv = buildFiserv(cfg);
         PlaidTransport plaidTransport = buildPlaid(cfg);
-        Entitlements entitlements = Entitlements.fromSpec(userId, cfg.get("FISERV_DEMO_ACCOUNTS", DEFAULT_ACCOUNTS));
+        Entitlements entitlements = Entitlements.fromConfig(cfg, DEFAULT_ACCOUNTS);
 
         if (args.length > 0 && args[0].equals("--check")) {
-            System.exit(check(fiserv, entitlements, userId));
+            System.exit(check(fiserv, entitlements));
         }
 
         AuditLog audit = new AuditLog();
         CoreBankingService core = new CoreBankingService(fiserv, entitlements);
-        TransferService transfers = new TransferService(core, entitlements, audit, cfg.getDecimal("TRANSFER_LIMIT_USD", "25000"));
+        TransferService transfers = new TransferService(core, entitlements, audit, cfg.getDecimal("TRANSFER_LIMIT_USD", "25000"),
+                cfg.getDecimal("MEMBER_TRANSFER_LIMIT_USD", "5000"), cfg.getDecimal("MEMBER_DAILY_LIMIT_USD", "10000"),
+                cfg.getInt("TRANSFERS_PER_MINUTE", 6));
         PlaidService plaid = new PlaidService(plaidTransport, cfg.get("PLAID_CLIENT_NAME", "PSK Bank Online Banking Demo"));
         ExternalFundingService funding = new ExternalFundingService(plaid, entitlements, audit, cfg.getDecimal("ACH_FUNDING_LIMIT_USD", "10000"));
 
@@ -81,6 +82,9 @@ public final class App {
                 obj("transactions", core.transactions(q.userId(), q.param(0), Integer.parseInt(q.query().getOrDefault("days", "60")))));
         r.post("/api/transfers/internal", q -> transfers.internal(q.userId(), q.requestId(), q.header("Idempotency-Key"),
                 Json.str(q.body(), "fromId"), Json.str(q.body(), "toId"), Json.num(q.body(), "amount")));
+        r.get("/api/payees", q -> obj("payees", transfers.payees(q.userId())));
+        r.post("/api/transfers/member", q -> transfers.toMember(q.userId(), q.requestId(), q.header("Idempotency-Key"),
+                Json.str(q.body(), "fromId"), Json.str(q.body(), "payeeId"), Json.num(q.body(), "amount")));
 
         // ---- external accounts (Plaid) ----
         r.post("/api/plaid/link-token", q -> plaid.linkToken(q.userId()));
@@ -95,6 +99,9 @@ public final class App {
 
         // ---- dev tools ----
         r.get("/api/dev/trace", q -> obj("events", com.pskbank.demo.core.Trace.snapshot()));
+        // Debug › Test accounts: every demo customer with live balances (masked numbers only). Not a customer API.
+        r.get("/api/dev/customers", q -> obj("customers", entitlements.users().stream().map(u -> obj(
+                "userId", u, "name", entitlements.name(u), "accounts", core.accounts(u).accounts())).toList()));
         r.get("/api/dev/status", q -> obj("fiserv", fiserv.mode(), "plaid", plaidTransport.mode(),
                 "circuitOpen", core.breaker().isOpen(),
                 "mockOutage", fiserv instanceof MockFiservTransport m && m.outage()));
@@ -112,8 +119,9 @@ public final class App {
         server.createContext("/", r);
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
         server.start();
-        System.out.printf("PSK Bank banking service on http://%s:%d  (fiserv=%s, plaid=%s, user=%s, accounts=%d)%n",
-                host, port, fiserv.mode(), plaidTransport.mode(), userId, entitlements.list(userId).size());
+        System.out.printf("PSK Bank banking service on http://%s:%d  (fiserv=%s, plaid=%s, customers=%s)%n",
+                host, port, fiserv.mode(), plaidTransport.mode(),
+                entitlements.users().stream().map(u -> u + ":" + entitlements.list(u).size()).toList());
     }
 
     private static FiservTransport buildFiserv(Config cfg) {
@@ -159,7 +167,7 @@ public final class App {
     }
 
     /** Live-mode smoke test you can run before starting the UI. */
-    private static int check(FiservTransport fiserv, Entitlements ent, String userId) {
+    private static int check(FiservTransport fiserv, Entitlements ent) {
         System.out.println("Fiserv mode: " + fiserv.mode());
         try {
             System.out.println("Token OK, expires in ~" + fiserv.tokenCheck() + "s");
@@ -168,12 +176,16 @@ public final class App {
             return 1;
         }
         int failures = 0;
-        for (AcctRef ref : ent.list(userId)) {
+        for (AcctRef ref : ent.users().stream().flatMap(u -> ent.list(u).stream()).toList()) {
             try {
+                Thread.sleep(400); // the shared trial sandbox rate-limits back-to-back calls
                 Map<String, Object> reply = fiserv.post(FiservPaths.ACCOUNT_INQUIRY, EfxMapper.accountInquiry(ref));
                 var a = EfxMapper.toAccount(ref, reply);
                 System.out.printf("  %-5s %s  OK  available=%s current=%s provider=%s%n", ref.acctType(), ref.masked(),
                         a.available(), a.current(), Json.str(reply, "Status.SvcProviderName"));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return 3;
             } catch (FiservException e) {
                 failures++;
                 System.out.printf("  %-5s %s  REJECTED  %s%n", ref.acctType(), ref.masked(), e.getMessage());

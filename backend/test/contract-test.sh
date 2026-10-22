@@ -14,7 +14,7 @@ export FISERV_MODE=live FISERV_HOST_URL=http://127.0.0.1:9101/banking/efx/v1 \
   FISERV_TOKEN_URL=http://127.0.0.1:9101/fts-apim/oauth2/v2 FISERV_API_KEY=test-key FISERV_API_SECRET=test-secret \
   FISERV_ORG_ID=PRMOrg10 "FISERV_DEMO_ACCOUNTS=SDA:0001112223:Sandbox Savings;DDA:000BAD:Bad Account" \
   PLAID_MODE=live PLAID_BASE_URL=http://127.0.0.1:9102 PLAID_CLIENT_ID=pc-id PLAID_SECRET=pc-secret PORT=8082 \
-  BFF_SHARED_SECRET=contract-test
+  BFF_SHARED_SECRET=contract-test DEMO_USERS=
 
 echo "== --check (expects 1 OK, 1 REJECTED)"
 java -cp out com.pskbank.demo.App --check || true
