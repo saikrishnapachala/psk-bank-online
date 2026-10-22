@@ -6,6 +6,7 @@
 # Secrets are read locally and sent only to Render. Nothing is printed except the demo password.
 #
 # Usage:  deploy/render-deploy.sh            (asks for your Render API key, hidden)
+#         deploy/render-deploy.sh --redeploy (rebuild both from the latest main; settings and password unchanged)
 #         DRY_RUN=1 deploy/render-deploy.sh  (prints the plan, calls nothing)
 # Get an API key: Render dashboard > Account settings > API Keys > Create API Key.
 set -euo pipefail
@@ -61,6 +62,17 @@ py() { python3 -c "import sys,json; d=json.load(sys.stdin); $1"; }
 
 OWNER=$(call GET "/owners?limit=1" | py 'print(d[0]["owner"]["id"])')
 echo "Render workspace: $OWNER"
+
+if [ "${1:-}" = "--redeploy" ]; then
+  for name in psk-bank-api psk-bank-online; do
+    id=$(call GET "/services?name=$name&limit=1" | py 'print(d[0]["service"]["id"] if d else "")')
+    [ -n "$id" ] || { echo "  $name not found; run without --redeploy first"; exit 1; }
+    call POST "/services/$id/deploys" '{"clearCache":"do_not_clear"}' >/dev/null
+    echo "  redeploying $name from the latest $BRANCH"
+  done
+  echo "Builds take ~5-10 minutes. Same URLs, same password."
+  exit 0
+fi
 
 # Find a service by name, or create it. Prints "id url".
 ensure() {
