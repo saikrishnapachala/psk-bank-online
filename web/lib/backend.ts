@@ -47,12 +47,15 @@ export async function backend<T>(path: string, opts: Options): Promise<T> {
       headers,
       body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
       cache: "no-store",
-      signal: AbortSignal.timeout(20_000),
+      // Free hosting puts the Java service to sleep when idle; waking it can take ~30-60s.
+      signal: AbortSignal.timeout(60_000),
     });
   } catch {
     done(503);
     record({ ts: new Date().toISOString(), rid: requestId, hop: "bff-java", method: opts.method ?? "GET", target: path, status: "DOWN", ms: 0, detail: "Java service unreachable" });
-    throw new BackendError(503, "BACKEND_UNREACHABLE", "The banking service isn't reachable. Is the Java backend running on " + base + "?", requestId);
+    throw new BackendError(503, "BACKEND_UNREACHABLE", process.env.NODE_ENV === "production"
+      ? "The banking service is still starting up. Wait a few seconds and reload the page."
+      : "The banking service isn't reachable. Is the Java backend running on " + base + "?", requestId);
   }
   done(res.status);
   const text = await res.text();
@@ -62,6 +65,12 @@ export async function backend<T>(path: string, opts: Options): Promise<T> {
     throw new BackendError(res.status, e.code ?? "ERROR", e.message ?? "Request failed", e.requestId ?? requestId);
   }
   return json as T;
+}
+
+/** Fire-and-forget ping so a sleeping Java service starts waking while the customer is still signing in. */
+export function wakeBackend() {
+  const base = process.env.BACKEND_URL ?? "http://127.0.0.1:8081";
+  fetch(base + "/health", { cache: "no-store", signal: AbortSignal.timeout(60_000) }).catch(() => {});
 }
 
 export async function health(): Promise<{ status: string; fiserv: string; plaid: string; fiservCircuitOpen: boolean } | null> {

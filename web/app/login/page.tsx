@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
 import { Logo } from "@/components/Logo";
 import { LoginForm } from "@/components/LoginForm";
+import { wakeBackend } from "@/lib/backend";
 import { getSession } from "@/lib/session";
 
 export default async function LoginPage() {
   if (await getSession()) redirect("/");
+  wakeBackend(); // the API is awake by the time the password is typed
   return (
     <main className="login-split">
       <section className="login-brand" aria-label="PSK Bank Online">
