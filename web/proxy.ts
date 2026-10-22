@@ -12,4 +12,4 @@ export function proxy(request: NextRequest) {
   return NextResponse.next({ request: { headers: h } });
 }
 
-export const config = { matcher: ["/((?!_next/|favicon|logs).*)"] };
+export const config = { matcher: ["/((?!_next/|favicon|logs|debug).*)"] };
