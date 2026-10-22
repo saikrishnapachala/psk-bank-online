@@ -127,6 +127,29 @@ export function BffTab() {
         <li><b>One error shape</b> (<code>{"{ error: { code, message, requestId } }"}</code>). <Why>the UI shows consistent messages and support gets the id.</Why></li>
       </ul>
 
+      <h2>Why Next.js</h2>
+      <ul className="practices">
+        <li><b>Server components fetch on the server.</b> Pages like the dashboard call Java while rendering, so they arrive with balances already in them and no API call ever leaves the browser for Java.</li>
+        <li><b>Route handlers are the BFF.</b> <code>app/api/…/route.ts</code> files are small server endpoints in the same project: no separate BFF service to build, deploy or secure.</li>
+        <li><b>Proxy runs before every request.</b> <code>proxy.ts</code> stamps the request id used by Debug › Logs.</li>
+        <li><b>One deploy.</b> UI and BFF ship together, so they can't drift out of sync.</li>
+      </ul>
+
+      <h2>How the BFF is configured</h2>
+      <table className="doc-table">
+        <thead><tr><th>File or setting</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td className="mono">lib/backend.ts</td><td>The only outbound client. Adds the shared secret, the user id from the session and the request id; 20s timeout; turns errors into one shape.</td></tr>
+          <tr><td className="mono">lib/forward.ts</td><td>Every change (transfers, linking) goes through it: session, origin and CSRF checks, then only whitelisted fields are forwarded.</td></tr>
+          <tr><td className="mono">lib/session.ts</td><td>HMAC-signed cookie holding user id, name, CSRF token and expiry. No server-side session store needed.</td></tr>
+          <tr><td className="mono">next.config.ts</td><td>Security headers (CSP, HSTS, frame and sniffing protection) and the dev-only list of LAN addresses.</td></tr>
+          <tr><td className="mono">BACKEND_URL</td><td>Where Java lives: <code>http://127.0.0.1:8081</code> locally, the <code>psk-bank-api</code> address on Render.</td></tr>
+          <tr><td className="mono">BACKEND_SHARED_SECRET</td><td>Must match Java's <code>BFF_SHARED_SECRET</code>; Java rejects any call without it.</td></tr>
+          <tr><td className="mono">SESSION_SECRET</td><td>Signs session cookies. Changing it signs everyone out.</td></tr>
+          <tr><td className="mono">DEMO_USERS, DEMO_PASSWORD</td><td>Demo sign-in list. Production replaces this with the bank's identity provider.</td></tr>
+        </tbody>
+      </table>
+
       <h2>Why Java behind the BFF</h2>
       <p>
         Banking rules (entitlements, limits, idempotency, audit) belong in one hardened service that any channel can share:
