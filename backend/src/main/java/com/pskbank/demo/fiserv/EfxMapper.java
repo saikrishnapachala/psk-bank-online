@@ -39,13 +39,22 @@ public final class EfxMapper {
      * treats it as a recurring transfer; ExpediteInd + per-leg TrnCode makes it post now (Fiserv "TMS" sample).
      */
     public static Map<String, Object> addTransfer(AcctRef from, AcctRef to, BigDecimal amount) {
+        return addTransfer(from, to, amount, "To " + to.nickname(), "From " + from.nickname());
+    }
+
+    /** fromDesc / toDesc are what each side sees in its Fiserv transaction history (kept under 32 chars). */
+    public static Map<String, Object> addTransfer(AcctRef from, AcctRef to, BigDecimal amount, String fromDesc, String toDesc) {
         return obj("OvrdAutoAckInd", false, "XferInfo", obj(
                 "CurAmt", obj("Amt", amount),
                 "ExpediteInd", true,
                 "FromAcctRef", leg(from, DEBIT_CODES),
                 "ToAcctRef", leg(to, CREDIT_CODES),
-                "XferFromDesc", List.of("PSK Bank Online transfer"),
-                "XferToDesc", List.of("PSK Bank Online transfer")));
+                "XferFromDesc", List.of(clip(fromDesc)),
+                "XferToDesc", List.of(clip(toDesc))));
+    }
+
+    private static String clip(String s) {
+        return s.length() <= 32 ? s : s.substring(0, 32);
     }
 
     // Premier transaction codes from Fiserv's Banking Hub Postman samples (DDA 47/20, SDA 120 credit; 147 SDA
@@ -188,7 +197,7 @@ public final class EfxMapper {
                 if (o instanceof String s && !s.isBlank()) parts.add(s.trim());
                 else if (o instanceof Map<?, ?> m && !m.isEmpty()) parts.add(String.valueOf(((Map<String, Object>) m).values().iterator().next()));
             }
-            return parts.isEmpty() ? "Transaction" : String.join(" ", parts);
+            return parts.isEmpty() ? "Transaction" : String.join(" ", parts.stream().distinct().toList()); // Premier repeats lines
         }
         return String.valueOf(desc);
     }
