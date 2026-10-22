@@ -344,3 +344,5 @@ h2 { font-stretch: 108%; font-weight: 720; }
 .tester .doc-table { border: 0; border-radius: 0; border-top: 1px solid var(--line); }
 .tester .doc-table .num { text-align: right; }
 .tester .doc-table .fig { font-size: 18px; }
+.doc pre.code { background: var(--ink); color: #f2f2f2; padding: 12px 14px; border-radius: 8px; overflow-x: auto; font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.doc .doc-table td.mono { font-size: 12.5px; word-break: break-word; }

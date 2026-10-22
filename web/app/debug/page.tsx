@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BffTab, FiservTab, HowItWorksTab, RobustnessTab } from "@/components/debug/Docs";
+import { AccountsAuthTab, ApisTab, JavaTab } from "@/components/debug/Platform";
 import { TestAccountsTab } from "@/components/debug/TestAccounts";
 import { LiveToggle } from "@/components/LiveToggle";
 import { LogExplorer } from "@/components/LogExplorer";
@@ -14,8 +15,11 @@ const TABS = [
   { key: "logs", label: "Logs" },
   { key: "accounts", label: "Test accounts" },
   { key: "how", label: "How it works" },
+  { key: "auth", label: "Accounts & auth" },
   { key: "fiserv", label: "Fiserv" },
-  { key: "bff", label: "BFF" },
+  { key: "bff", label: "Next.js & BFF" },
+  { key: "java", label: "Java service" },
+  { key: "apis", label: "APIs" },
   { key: "robust", label: "Robustness" },
 ] as const;
 type Tab = (typeof TABS)[number]["key"];
@@ -80,7 +84,10 @@ export default async function DebugPage({ searchParams }: { searchParams: Promis
         )}
         {tab === "accounts" && <TestAccountsTab customers={customers} error={error} />}
         {tab === "how" && <HowItWorksTab />}
+        {tab === "auth" && <AccountsAuthTab />}
         {tab === "fiserv" && <FiservTab />}
+        {tab === "java" && <JavaTab />}
+        {tab === "apis" && <ApisTab />}
         {tab === "bff" && <BffTab />}
         {tab === "robust" && <RobustnessTab />}
       </main>
