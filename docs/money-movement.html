@@ -1,0 +1,502 @@
+<title>PSK Bank Money Movement</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column with wide diagram bands; PSK Bank red marks money leaving or arriving, black marks the core. */
+:root {
+  --bg: #f3f3f2;
+  --surface: #ffffff;
+  --ink: #0d0d0d;
+  --muted: #5b5c5e;
+  --line: #d9d9d6;
+  --red: #eb0a1e;
+  --red-soft: #fde7e9;
+  --ok: #1f6b45;
+  --ok-soft: #e7f4ec;
+  --warn: #8a5a00;
+  --warn-soft: #fff4dc;
+  --chip: #ececea;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111112; --surface: #1b1b1d; --ink: #f1f1ef; --muted: #a9aaad; --line: #34353a;
+    --red: #ff3b4b; --red-soft: #3a1418; --ok: #5ccf8f; --ok-soft: #14291d; --warn: #f2bd57; --warn-soft: #33270f; --chip: #2a2a2e;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111112; --surface: #1b1b1d; --ink: #f1f1ef; --muted: #a9aaad; --line: #34353a;
+  --red: #ff3b4b; --red-soft: #3a1418; --ok: #5ccf8f; --ok-soft: #14291d; --warn: #f2bd57; --warn-soft: #33270f; --chip: #2a2a2e;
+  color-scheme: dark;
+}
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+.wrap { max-width: 980px; margin: 0 auto; }
+.read { max-width: 68ch; }
+header.top { padding-block: 40px 24px; border-bottom: 3px solid var(--ink); margin-bottom: 32px; }
+.mark { display: inline-flex; align-items: center; gap: 10px; font-weight: 800; font-stretch: 112%; letter-spacing: -0.01em; }
+.mark svg { flex: none; }
+h1 { font-family: var(--display); font-stretch: 118%; font-weight: 800; font-size: clamp(32px, 5.5vw, 58px); line-height: 1.02; letter-spacing: -0.02em; margin: 18px 0 14px; text-wrap: balance; }
+h2 { font-family: var(--display); font-stretch: 110%; font-weight: 760; font-size: clamp(22px, 3vw, 30px); line-height: 1.15; margin: 56px 0 10px; text-wrap: balance; }
+h3 { font-size: 17px; font-weight: 700; margin: 24px 0 6px; }
+p { margin: 0 0 12px; }
+.lead { font-size: 18px; color: var(--ink); }
+.muted { color: var(--muted); }
+small, .small { font-size: 14px; }
+code, .mono { font-family: var(--mono); font-size: 0.86em; }
+.journey { font-family: var(--mono); font-size: 13px; color: var(--red); font-weight: 500; margin-top: 56px; }
+.journey + h2 { margin-top: 4px; }
+
+/* answer box */
+.answer { background: var(--ink); color: var(--bg); border-radius: 14px; padding: 22px 24px; margin: 8px 0 8px; display: grid; gap: 10px; }
+.answer b { color: var(--bg); }
+.answer p { margin: 0; max-width: 72ch; }
+.answer .k { color: var(--red); font-weight: 700; }
+
+/* tables */
+.tbl { overflow-x: auto; margin: 12px 0 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-top: 1px solid var(--line); }
+thead th { border-top: 0; font-weight: 650; color: var(--muted); font-size: 13px; background: var(--bg); }
+td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+tr.pick td { background: var(--ok-soft); }
+.pill { display: inline-block; font-size: 12px; font-weight: 650; padding: 1px 8px; border-radius: 999px; background: var(--chip); color: var(--ink); white-space: nowrap; }
+.pill.ok { background: var(--ok-soft); color: var(--ok); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.red { background: var(--red-soft); color: var(--red); }
+
+/* diagram band */
+.fig { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin: 14px 0 6px; overflow-x: auto; }
+.fig figcaption { font-size: 13px; color: var(--muted); margin-top: 8px; }
+.fig svg { display: block; width: 100%; min-width: 720px; height: auto; }
+.fig pre.mermaid { margin: 0; background: transparent; }
+
+/* svg tokens */
+.s-box { fill: var(--surface); stroke: var(--ink); stroke-width: 1.5; }
+.s-core { fill: var(--ink); stroke: var(--ink); }
+.s-red { fill: var(--red-soft); stroke: var(--red); stroke-width: 1.5; }
+.s-soft { fill: var(--bg); stroke: var(--line); stroke-width: 1.2; stroke-dasharray: 5 5; }
+.s-t { fill: var(--ink); font: 700 14px var(--body); }
+.s-tc { fill: var(--bg); font: 700 14px var(--body); }
+.s-s { fill: var(--muted); font: 12px var(--body); }
+.s-sc { fill: var(--line); font: 12px var(--body); }
+.s-z { fill: var(--muted); font: 600 11px var(--body); letter-spacing: .06em; }
+.s-line { stroke: var(--ink); stroke-width: 1.6; fill: none; }
+.s-money { stroke: var(--red); stroke-width: 2.4; fill: none; }
+.s-data { stroke: var(--muted); stroke-width: 1.4; fill: none; stroke-dasharray: 4 4; }
+.s-lbl { fill: var(--ink); font: 600 11.5px var(--body); }
+.s-lblr { fill: var(--red); font: 700 11.5px var(--body); }
+.s-arrow { fill: var(--ink); } .s-arrowr { fill: var(--red); } .s-arrowm { fill: var(--muted); }
+
+/* layout helpers */
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin: 12px 0; }
+.two > * { min-width: 0; }
+.note { border-left: 3px solid var(--red); padding: 4px 0 4px 14px; margin: 14px 0; }
+.ledger { font-family: var(--mono); font-size: 13px; }
+ol.steps { padding-left: 22px; margin: 8px 0 12px; }
+ol.steps li { margin: 6px 0; padding-left: 2px; }
+ul.tight { padding-left: 20px; margin: 6px 0 12px; } ul.tight li { margin: 4px 0; }
+.toc { display: flex; flex-wrap: wrap; gap: 6px; margin: 18px 0 0; }
+.toc a { font-size: 13.5px; text-decoration: none; color: var(--ink); border: 1px solid var(--line); background: var(--surface); padding: 4px 10px; border-radius: 999px; }
+.toc a:hover { border-color: var(--ink); }
+a { color: var(--ink); }
+:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; border-radius: 4px; }
+footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+</style>
+
+<div class="wrap">
+<header class="top">
+  <span class="mark">
+    <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#EB0A1E"/><path d="M9 25V7h7.5a6.5 6.5 0 0 1 0 13H13" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="16.4" cy="13.5" r="1.9" fill="#fff"/></svg>
+    PSK Bank · team briefing
+  </span>
+  <h1>How money actually moves at PSK Bank</h1>
+  <p class="lead read">A walkthrough for a brand-new bank with ten customers holding about $10 million each: what happens when one of them sends $500,000 to a friend, pulls $1 million in from Chase, or pays a bill, and who is responsible at every step.</p>
+  <nav class="toc" aria-label="Sections">
+    <a href="#roles">Who does what</a><a href="#summary">Four journeys</a><a href="#internal">A · Between PSK customers</a>
+    <a href="#outbound">B · $500k to a friend</a><a href="#pull">C · $1M from Chase</a><a href="#chase-out">D · Chase money elsewhere</a>
+    <a href="#incoming">E · Money coming in</a><a href="#responsibility">Responsibility</a><a href="#architecture">Target setup</a><a href="#demo">Our demo today</a><a href="#qa">Team Q&amp;A</a>
+  </nav>
+</header>
+
+<section aria-labelledby="short">
+  <h2 id="short" style="margin-top:0">The short answer</h2>
+  <div class="answer">
+    <p><span class="k">Fiserv keeps the books.</span> The core (Premier, DNA or the cloud-native Finxact) holds every account and balance and posts every debit and credit. That is the part our demo calls today.</p>
+    <p><span class="k">Fiserv can also connect you to the payment networks</span> (ACH, wires, real-time payments, Zelle, bill pay), but each of those is a separate product you contract for. Banking Hub's account APIs alone don't send money to other banks.</p>
+    <p><span class="k">PSK Bank owns every decision and the risk.</span> As the licensed bank, you decide who can send what, screen for fraud and sanctions, hold enough money at the Federal Reserve to settle, and answer for mistakes. Fiserv runs the machinery; it doesn't carry your liability.</p>
+    <p><span class="k">Money between banks never travels core to core.</span> It moves between the two banks' accounts at the Federal Reserve. Each core just records its side.</p>
+  </div>
+</section>
+
+<section aria-labelledby="roles">
+  <h2 id="roles">Who does what</h2>
+  <p class="read">Every external payment touches the same cast. Red lines carry money; dashed lines carry only data.</p>
+  <figure class="fig">
+    <svg viewBox="0 0 1000 430" role="img" aria-labelledby="roles-t roles-d">
+      <title id="roles-t">Parties in a PSK Bank payment</title>
+      <desc id="roles-d">The customer uses PSK Bank Online. PSK Bank's Java services decide and orchestrate. Fiserv's core keeps the ledger and Fiserv payment products connect to the Federal Reserve and The Clearing House, where PSK Bank's settlement account sits. Chase connects to the same networks. Plaid only shares data about the Chase account.</desc>
+      <defs>
+        <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="s-arrow"/></marker>
+        <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="s-arrowr"/></marker>
+        <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="s-arrowm"/></marker>
+      </defs>
+      <rect x="10" y="14" width="560" height="402" rx="14" class="s-soft"/>
+      <text x="26" y="38" class="s-z">PSK BANK (YOUR RESPONSIBILITY)</text>
+      <rect x="590" y="14" width="400" height="402" rx="14" class="s-soft"/>
+      <text x="606" y="38" class="s-z">OUTSIDE PSK BANK</text>
+
+      <rect x="30" y="60" width="160" height="80" rx="10" class="s-box"/>
+      <text x="44" y="88" class="s-t">Customer</text>
+      <text x="44" y="108" class="s-s">web or mobile app</text>
+      <text x="44" y="124" class="s-s">MFA before sending</text>
+
+      <rect x="230" y="60" width="320" height="80" rx="10" class="s-box"/>
+      <text x="244" y="88" class="s-t">PSK services (Java)</text>
+      <text x="244" y="108" class="s-s">payees, limits, fraud and sanctions checks,</text>
+      <text x="244" y="124" class="s-s">payment status, audit, reconciliation</text>
+
+      <rect x="30" y="200" width="250" height="96" rx="10" class="s-core"/>
+      <text x="44" y="228" class="s-tc">Fiserv core</text>
+      <text x="44" y="248" class="s-sc">accounts, balances, holds,</text>
+      <text x="44" y="264" class="s-sc">postings, statements</text>
+      <text x="44" y="282" class="s-sc">(Banking Hub APIs)</text>
+
+      <rect x="300" y="200" width="250" height="96" rx="10" class="s-red"/>
+      <text x="314" y="228" class="s-t">Fiserv payment products</text>
+      <text x="314" y="248" class="s-s">ACH, wires, RTP and FedNow</text>
+      <text x="314" y="264" class="s-s">connectivity, Zelle, bill pay</text>
+      <text x="314" y="282" class="s-s">(each contracted separately)</text>
+
+      <rect x="30" y="336" width="520" height="62" rx="10" class="s-box"/>
+      <text x="44" y="362" class="s-t">PSK's settlement account at the Federal Reserve</text>
+      <text x="44" y="382" class="s-s">real money between banks moves here; treasury keeps it funded</text>
+
+      <rect x="610" y="60" width="360" height="80" rx="10" class="s-box"/>
+      <text x="624" y="88" class="s-t">Plaid</text>
+      <text x="624" y="108" class="s-s">proves the customer owns the Chase account,</text>
+      <text x="624" y="124" class="s-s">shares account number and balance. Moves no money.</text>
+
+      <rect x="610" y="200" width="360" height="96" rx="10" class="s-box"/>
+      <text x="624" y="228" class="s-t">Payment networks</text>
+      <text x="624" y="248" class="s-s">FedACH and Fedwire (Federal Reserve)</text>
+      <text x="624" y="264" class="s-s">FedNow (Federal Reserve)</text>
+      <text x="624" y="280" class="s-s">ACH and RTP (The Clearing House)</text>
+
+      <rect x="610" y="336" width="360" height="62" rx="10" class="s-box"/>
+      <text x="624" y="362" class="s-t">Chase, or the friend's bank</text>
+      <text x="624" y="382" class="s-s">its own core, its own account at the Fed</text>
+
+      <path d="M190 100 H230" class="s-line" marker-end="url(#a1)"/>
+      <path d="M300 140 V200" class="s-line" marker-end="url(#a1)"/>
+      <text x="306" y="176" class="s-lbl">hold, post</text>
+      <path d="M150 140 V200" class="s-line" marker-end="url(#a1)" marker-start="url(#a1)"/>
+      <text x="158" y="176" class="s-lbl">balances</text>
+      <path d="M480 140 V200" class="s-line" marker-end="url(#a1)"/>
+      <text x="486" y="176" class="s-lbl">submit</text>
+      <path d="M550 248 H610" class="s-money" marker-end="url(#a2)" marker-start="url(#a2)"/>
+      <text x="556" y="240" class="s-lblr">payment</text>
+      <path d="M550 367 H610" class="s-money" marker-end="url(#a2)" marker-start="url(#a2)"/>
+      <text x="557" y="359" class="s-lblr">settles</text>
+      <path d="M790 296 V336" class="s-money" marker-end="url(#a2)" marker-start="url(#a2)"/>
+      <path d="M550 100 H610" class="s-data" marker-end="url(#a3)" marker-start="url(#a3)"/>
+      <text x="556" y="92" class="s-lbl">data</text>
+    </svg>
+    <figcaption>Fiserv sits on both sides of the line inside PSK Bank: it runs your ledger and your network connections, under your bank's name and rules.</figcaption>
+  </figure>
+</section>
+
+<section aria-labelledby="summary">
+  <h2 id="summary">The four journeys at a glance</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Customer wants to</th><th>Rail</th><th>Arrives</th><th>Can it be pulled back?</th><th>Who carries the risk</th></tr></thead>
+    <tbody>
+      <tr><td><b>A.</b> Pay another PSK customer</td><td>None: a book transfer inside the core</td><td>Instantly</td><td>Only by PSK reversing it</td><td>PSK (both sides are yours)</td></tr>
+      <tr><td><b>B.</b> Send $500k to a friend at another bank</td><td>Wire or RTP (recommended), same-day ACH</td><td>Minutes (wire, RTP) or same day (ACH)</td><td><span class="pill red">No</span> for wires and RTP; ACH has narrow exceptions</td><td>PSK, if it sends a fraudulent payment</td></tr>
+      <tr><td><b>C.</b> Pull $1M from their own Chase account</td><td>ACH debit started by PSK, or a push from Chase</td><td>1–2 business days (ACH)</td><td><span class="pill warn">Yes</span>, up to 60 days if "unauthorized"</td><td>PSK, until the return window passes</td></tr>
+      <tr><td><b>D.</b> Send Chase money to someone else</td><td>Chase's own payment, or pull into PSK first</td><td>Depends on the rail</td><td>Depends on the rail</td><td>Chase (if sent from Chase)</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<p class="journey">Journey A</p>
+<h2 id="internal">Paying another PSK Bank customer</h2>
+<p class="read">This is what the demo does today: Alex sends money to Jordan. Both accounts live in the same Fiserv core, so no network is involved. One API call moves the money on both sides at once.</p>
+<figure class="fig">
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  actor Alex
+  participant App as PSK Bank Online
+  participant Java as PSK services (Java)
+  participant Core as Fiserv core
+  Alex->>App: Send $20,000 to Jordan
+  App->>Java: transfer request + idempotency key
+  Java->>Java: entitlement, limits, velocity, fraud score
+  Java->>Core: read Alex's available balance
+  Java->>Core: Add Transfer (debit Alex, credit Jordan)
+  Core-->>Java: posted (EFX 0)
+  Java-->>App: confirmation number
+  Note over Core: Both balances change at once. No Fed account moves.
+</pre>
+<figcaption>Fastest and safest payment you'll ever offer: no network fees, no settlement risk, final the moment it posts.</figcaption>
+</figure>
+
+<p class="journey">Journey B</p>
+<h2 id="outbound">Sending $500,000 to a friend at another bank</h2>
+<p class="read">First the customer adds the friend as a payee (name, routing number, account number). Then they send. For half a million dollars, the rail choice matters more than anything else.</p>
+
+<h3>Which rail for $500,000</h3>
+<div class="tbl"><table>
+  <thead><tr><th>Rail</th><th>Who runs it</th><th>Speed</th><th>Per-payment ceiling</th><th>Final?</th><th>Fit for $500k</th></tr></thead>
+  <tbody>
+    <tr class="pick"><td><b>Wire</b> (Fedwire)</td><td>Federal Reserve</td><td>Minutes, business hours</td><td class="num">No practical cap</td><td>Yes, immediately</td><td><span class="pill ok">Best default</span> the standard for large, one-off payments</td></tr>
+    <tr class="pick"><td><b>RTP</b></td><td>The Clearing House</td><td>Seconds, 24/7</td><td class="num">$10 million network cap</td><td>Yes, immediately</td><td><span class="pill ok">Great</span> if the friend's bank is on RTP</td></tr>
+    <tr><td><b>FedNow</b></td><td>Federal Reserve</td><td>Seconds, 24/7</td><td class="num">Network cap, banks set lower</td><td>Yes, immediately</td><td><span class="pill">Check limits</span> its ceiling started at $500k</td></tr>
+    <tr><td><b>Same-day ACH</b></td><td>Federal Reserve or The Clearing House</td><td>Same business day</td><td class="num">$1 million</td><td>Mostly</td><td><span class="pill warn">Possible</span> cheaper, but slower and batch-based</td></tr>
+    <tr><td><b>Zelle</b></td><td>Early Warning (Fiserv can connect you)</td><td>Minutes</td><td class="num">Low, set by each bank</td><td>Yes</td><td><span class="pill red">No</span> built for everyday person-to-person amounts</td></tr>
+  </tbody>
+</table></div>
+<p class="small muted">Network limits change; confirm current caps with Fiserv and the networks before go-live.</p>
+
+<h3>What happens, step by step (wire or RTP)</h3>
+<figure class="fig">
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  actor Cust as Customer
+  participant App as PSK Bank Online
+  participant Java as PSK services (Java)
+  participant Core as Fiserv core
+  participant Pay as Fiserv payments
+  participant Net as Fedwire / RTP
+  participant Fed as PSK account at the Fed
+  participant Other as Friend's bank
+  Cust->>App: Send $500,000 to new payee "Ravi"
+  App->>Cust: Step-up MFA (and a call-back for first large payment)
+  App->>Java: payment request + idempotency key
+  Java->>Java: limits, fraud score, sanctions screening, payee check
+  Java->>Core: place a $500,000 hold on the account
+  Java->>Pay: create wire / RTP message (ISO 20022)
+  Pay->>Net: submit
+  Net->>Fed: debit PSK's Fed account $500,000
+  Net->>Other: credit friend's bank, deliver message
+  Other-->>Net: accepted (RTP) / received (wire)
+  Net-->>Pay: confirmation
+  Pay-->>Java: settled
+  Java->>Core: post the $500,000 debit, release the hold
+  Java-->>App: "Sent" with reference number
+</pre>
+<figcaption>The hold is what stops the customer spending the same money twice while the payment is in flight.</figcaption>
+</figure>
+
+<div class="two">
+  <div class="fig" style="margin:0">
+    <h3 style="margin-top:0">What PSK's books record</h3>
+    <div class="tbl" style="margin:0"><table class="ledger">
+      <thead><tr><th>Account</th><th>Debit</th><th>Credit</th></tr></thead>
+      <tbody>
+        <tr><td>Customer checking</td><td class="num">500,000</td><td></td></tr>
+        <tr><td>Outgoing wire clearing</td><td></td><td class="num">500,000</td></tr>
+        <tr><td>Outgoing wire clearing</td><td class="num">500,000</td><td></td></tr>
+        <tr><td>Due from Federal Reserve</td><td></td><td class="num">500,000</td></tr>
+      </tbody>
+    </table></div>
+    <p class="small muted" style="margin:8px 0 0">Clearing accounts let reconciliation match the core to the Fed statement every day.</p>
+  </div>
+  <div class="fig" style="margin:0">
+    <h3 style="margin-top:0">Checks PSK must run before it sends</h3>
+    <ul class="tight small">
+      <li><b>Sanctions screening</b> of the payee against OFAC lists (required).</li>
+      <li><b>Fraud scoring</b>: new payee, new device, unusual amount, scam patterns.</li>
+      <li><b>Payee verification</b>: does the name match the account? Account validation services can check.</li>
+      <li><b>Limits</b>: per payment, per day, cooling-off period for new payees.</li>
+      <li><b>Liquidity</b>: enough money in PSK's Fed account to settle.</li>
+    </ul>
+  </div>
+</div>
+<p class="note read"><b>Why the checks matter so much here:</b> wires and RTP payments are final. If a customer is tricked into sending $500,000, there is no network button to get it back. PSK can only ask the other bank to return it.</p>
+
+<p class="journey">Journey C</p>
+<h2 id="pull">Linking a Chase account and pulling in $1 million</h2>
+<p class="read">Plaid's job ends once it has proved the customer owns the Chase account and shared its numbers and balance. Moving the money is a separate step, and PSK has two ways to do it.</p>
+<figure class="fig">
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  actor Cust as Customer
+  participant App as PSK Bank Online
+  participant Plaid
+  participant Chase
+  participant Java as PSK services (Java)
+  participant Pay as Fiserv ACH
+  participant ACH as ACH network
+  participant Core as Fiserv core
+  Cust->>App: Link my Chase account
+  App->>Plaid: open Plaid Link
+  Cust->>Chase: signs in to Chase (inside Plaid)
+  Plaid-->>Java: account + routing numbers, owner name, balance
+  Note over Java: Chase shares a tokenized account number:<br/>works for ACH, not for wires
+  Cust->>App: Move $1,000,000 from Chase to PSK
+  Java->>Java: balance check, return-risk score, limits
+  Java->>Pay: ACH debit (WEB entry) against Chase account
+  Pay->>ACH: send in the next batch
+  ACH->>Chase: debit customer's Chase account
+  ACH-->>Pay: settles in 1-2 business days
+  Pay->>Core: credit PSK account (with a hold)
+  Note over Core: Hold released after the return risk window PSK chooses
+</pre>
+<figcaption>PSK is the bank that starts this ACH debit (the "originating" bank), so PSK answers for it if Chase sends it back.</figcaption>
+</figure>
+
+<div class="two">
+  <div>
+    <h3>The risk in pulling money</h3>
+    <p class="small">A consumer can tell Chase the debit was unauthorized for up to <b>60 days</b>, and Chase will send it back. If PSK has already let the customer spend the $1M, PSK is left short. That's why pull transfers come with lower limits and holds on the incoming funds.</p>
+  </div>
+  <div>
+    <h3>The better option for $1 million</h3>
+    <p class="small">Have the customer <b>push</b> it: send a wire or RTP payment from Chase to their PSK account. It's final, it arrives in minutes, and Chase does the fraud checks. PSK shows its own account and routing number in the app to make that easy. Keep ACH pulls for smaller, regular top-ups.</p>
+  </div>
+</div>
+
+<p class="journey">Journey D</p>
+<h2 id="chase-out">Sending the Chase money to someone else, or paying a bill</h2>
+<p class="read">PSK Bank can't instruct Chase to pay a third party. Linking an account with Plaid only lets PSK read it and pull money into PSK. So there are two honest options:</p>
+<div class="two">
+  <div class="fig" style="margin:0">
+    <h3 style="margin-top:0">Option 1: pay from Chase directly</h3>
+    <p class="small" style="margin:0">The customer uses the Chase app. Chase is the sending bank, runs its own checks, and carries the risk. PSK isn't involved.</p>
+  </div>
+  <div class="fig" style="margin:0">
+    <h3 style="margin-top:0">Option 2: bring it to PSK, then send</h3>
+    <p class="small" style="margin:0">Pull or push the money into PSK (Journey C), then send it out as in Journey B, or pay a bill through PSK's bill pay. Two hops, but the customer stays in PSK Bank Online.</p>
+  </div>
+</div>
+<h3>Paying bills from PSK</h3>
+<p class="read small">Bill pay is its own service. Fiserv's bill payment product (the former CheckFree network) knows thousands of billers. PSK's app collects the bill, PSK debits the customer's account, and the bill pay provider pays the biller electronically, or mails a check when the biller isn't connected.</p>
+
+<p class="journey">Journey E</p>
+<h2 id="incoming">Money coming in from other banks</h2>
+<div class="tbl"><table>
+  <thead><tr><th>Arrives as</th><th>How PSK receives it</th><th>When the customer can use it</th></tr></thead>
+  <tbody>
+    <tr><td>Wire, RTP, FedNow</td><td>Fiserv's payment product receives the message; PSK screens it for sanctions; the core posts the credit</td><td>Within minutes, after screening</td></tr>
+    <tr><td>ACH credit (payroll, a friend's ACH)</td><td>Fiserv processes the incoming ACH file and posts each entry to the right account</td><td>On the settlement date</td></tr>
+    <tr><td>Check deposit (mobile)</td><td>Image capture, then check clearing</td><td>Per PSK's funds-availability policy</td></tr>
+  </tbody>
+</table></div>
+
+<section aria-labelledby="responsibility">
+  <h2 id="responsibility">Who is responsible for what</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Responsibility</th><th>PSK Bank</th><th>Fiserv</th><th>Fed / The Clearing House</th><th>Plaid</th></tr></thead>
+    <tbody>
+      <tr><td>Know your customer, account opening</td><td><span class="pill red">Owns</span></td><td>Tools</td><td></td><td></td></tr>
+      <tr><td>Ledger: balances, holds, postings</td><td>Decides</td><td><span class="pill">Runs</span></td><td></td><td></td></tr>
+      <tr><td>Approving a payment (limits, fraud, MFA)</td><td><span class="pill red">Owns</span></td><td>Fraud tools if bought</td><td></td><td></td></tr>
+      <tr><td>Sanctions screening (OFAC) and anti-money-laundering</td><td><span class="pill red">Owns</span></td><td>Screening tools if bought</td><td></td><td></td></tr>
+      <tr><td>Building and sending payment messages and ACH files</td><td>Instructs</td><td><span class="pill">Runs</span></td><td>Receives</td><td></td></tr>
+      <tr><td>Moving money between banks (settlement)</td><td>Funds its Fed account</td><td></td><td><span class="pill">Runs</span></td><td></td></tr>
+      <tr><td>Nacha rules as the bank that sends ACH</td><td><span class="pill red">Owns</span></td><td>Helps comply</td><td>Operator</td><td></td></tr>
+      <tr><td>Customer disputes and error claims</td><td><span class="pill red">Owns</span></td><td>Case tools</td><td></td><td></td></tr>
+      <tr><td>Verifying an external account</td><td>Decides to trust it</td><td></td><td></td><td><span class="pill">Provides data</span></td></tr>
+      <tr><td>Daily reconciliation (core vs. Fed vs. networks)</td><td><span class="pill red">Owns</span></td><td>Reports</td><td>Statements</td><td></td></tr>
+    </tbody>
+  </table></div>
+  <p class="note read"><b>One sentence for the team:</b> Fiserv is our ledger and our plumbing; PSK Bank is the bank. Every rule about who may move money, and every loss when something goes wrong, sits with us.</p>
+</section>
+
+<section aria-labelledby="architecture">
+  <h2 id="architecture">The setup I'd build for a brand-new bank</h2>
+  <p class="read">With no legacy to work around, aim for real-time first, one payments service that knows every rail, and the core kept as the single source of truth.</p>
+  <figure class="fig">
+<pre class="mermaid">
+flowchart LR
+  C[Customer apps<br/>web + mobile] --> B[Next.js BFF<br/>session, CSRF]
+  B --> P[Payments service<br/>one state machine for every rail]
+  B --> A[Accounts service<br/>entitlements, balances]
+  P --> R[Risk<br/>fraud score, sanctions, limits]
+  P --> Y[Payees<br/>verified accounts]
+  A --> K[(Fiserv core<br/>Finxact or Premier)]
+  P --> K
+  P --> H[Fiserv payment products<br/>or another ISO 20022 hub]
+  H --> N1[Fedwire]
+  H --> N2[RTP + FedNow]
+  H --> N3[ACH]
+  Y --> PL[Plaid<br/>account verification]
+  P --> E[(Payment database<br/>+ event stream)]
+  E --> X[Reconciliation<br/>core vs. Fed vs. networks]
+</pre>
+  <figcaption>The browser and the BFF stay exactly as in the demo. Everything new lives behind the Java layer.</figcaption>
+  </figure>
+  <div class="two">
+    <div>
+      <h3>Choices that pay off</h3>
+      <ul class="tight small">
+        <li><b>Real-time rails first:</b> RTP and FedNow for most payments, wires for very large or international ones, ACH for payroll, bills and cheap batch.</li>
+        <li><b>One payment state machine</b> (created, checked, held, sent, settled, posted, or returned) so every rail is tracked and reported the same way.</li>
+        <li><b>ISO 20022 everywhere:</b> Fedwire, FedNow and RTP all use it; one message model for the whole bank.</li>
+        <li><b>Cloud-native core:</b> Fiserv's Finxact is built for API-first banks; Premier and DNA work too.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>For customers with $10 million each</h3>
+      <ul class="tight small">
+        <li><b>Deposit insurance:</b> the FDIC covers $250,000 per depositor per ownership category, so most of a $10M balance is uninsured. Reciprocal deposit networks spread it across banks to keep it covered.</li>
+        <li><b>Liquidity:</b> ten customers holding $100M means one $5M wire is 5% of deposits. Treasury needs live visibility of the Fed account.</li>
+        <li><b>Relationship-level controls:</b> named approvers and call-backs for large payments, not just app limits.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="demo">
+  <h2 id="demo">What our demo does today, and what comes next</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Capability</th><th>Today</th><th>To build</th></tr></thead>
+    <tbody>
+      <tr><td>Balances, history, account details</td><td><span class="pill ok">Live on Fiserv</span></td><td>Statements, alerts</td></tr>
+      <tr><td>Transfers between own accounts</td><td><span class="pill ok">Live on Fiserv</span></td><td>Scheduled and recurring transfers</td></tr>
+      <tr><td>Pay another PSK customer (Journey A)</td><td><span class="pill ok">Live on Fiserv</span></td><td>Payee by email or phone</td></tr>
+      <tr><td>Link an outside bank with Plaid</td><td><span class="pill warn">Mock Plaid</span></td><td>Plaid sandbox keys, then production</td></tr>
+      <tr><td>Pull money in by ACH (Journey C)</td><td><span class="pill warn">Simulated</span></td><td>ACH origination product, holds, return handling</td></tr>
+      <tr><td>Send to another bank (Journey B)</td><td><span class="pill">Not built</span></td><td>Payees, wire and RTP/FedNow, sanctions and fraud checks</td></tr>
+      <tr><td>Bill pay (Journey D)</td><td><span class="pill">Not built</span></td><td>Bill payment provider integration</td></tr>
+    </tbody>
+  </table></div>
+  <p class="small muted read">Why the gaps: the Banking Hub trial gives us core account APIs. Sending money to other banks needs Fiserv's payment products (or another provider) under a real bank contract.</p>
+</section>
+
+<section aria-labelledby="qa">
+  <h2 id="qa">Questions the team will ask</h2>
+  <div class="two">
+    <div>
+      <h3>Does Fiserv send the money?</h3>
+      <p class="small">Its payment products build and submit the messages, if PSK contracts for them. The money itself settles through PSK's account at the Federal Reserve.</p>
+      <h3>Is Plaid a payment network?</h3>
+      <p class="small">No. Plaid confirms the account and shares its details. PSK moves the money over ACH, or the customer pushes it from Chase.</p>
+      <h3>Why not use Zelle for $500k?</h3>
+      <p class="small">Zelle is built for everyday person-to-person payments with low limits. Large payments go by wire or RTP.</p>
+    </div>
+    <div>
+      <h3>What if the friend's bank isn't on RTP?</h3>
+      <p class="small">Fall back to a wire. The payments service picks the rail from the amount, the receiving bank and the time of day.</p>
+      <h3>Who pays back a scam loss?</h3>
+      <p class="small">For a payment the customer authorized, usually nobody is required to, which is why PSK's checks before sending are the real protection. For an unauthorized payment, consumer protection rules put most of the loss on PSK.</p>
+      <h3>Do we need a Fed account?</h3>
+      <p class="small">Yes, or a correspondent bank that settles for us. Every external payment ends there.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  Prepared for the PSK Bank Online team. Network limits, product names and rules change; confirm specifics with Fiserv, Nacha and the Federal Reserve before go-live.
+</footer>
+</div>
