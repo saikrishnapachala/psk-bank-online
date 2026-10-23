@@ -1,29 +1,56 @@
-# PSK Bank Online — demo (Next.js BFF + Java + Fiserv Banking Hub + Plaid)
+# PSK Bank Online
 
-A runnable reference for the architecture in the Fiserv research doc:
+A working online-banking demo for **PSK Bank**, built on the live **Fiserv Banking Hub** sandbox.
+Three test customers sign in on their own laptops, see real core balances and history, and send money to each
+other. Every hop, from browser to Fiserv, is visible in the app's **Debug** area.
 
 ```
-Browser ──HTTPS, session cookie──▶ Next.js (UI + thin BFF) ──private REST + shared secret──▶ Java banking service
-                                                                                              ├──▶ Fiserv Banking Hub (EFX)
-                                                                                              └──▶ Plaid
+Browser ──HTTPS, session cookie──▶ Next.js (UI + BFF) ──private REST + shared secret──▶ Java banking service
+                                                                                         ├──▶ Fiserv Banking Hub (EFX)
+                                                                                         └──▶ Plaid
 ```
 
-- **The browser never sees a Fiserv or Plaid credential.** It talks only to Next.js.
-- **Next.js holds no banking secrets.** It owns the session, CSRF, and shaping data for screens.
-- **The Java service is the only Fiserv/Plaid caller.** It owns entitlements, limits, idempotency, audit, the circuit breaker and EFX mapping.
+- **The browser never sees a Fiserv or Plaid credential**, or a real account number. It only talks to Next.js.
+- **Next.js holds no banking secrets.** It owns the session, CSRF protection and shaping data for each screen.
+- **Java is the only Fiserv and Plaid caller.** It owns entitlements, limits, idempotency, audit, resilience and the EFX mapping.
 
-Both providers run in **mock** mode out of the box, so the whole app works offline. Flip each one to **live** with your keys.
+Live demo (Render free plan): https://psk-bank-online.onrender.com. The first visit after ~15 idle minutes takes 30–60 seconds while it wakes up.
 
-![Dashboard](docs/screenshots/dashboard.png)
+## What you can do
 
-## Run it (mock mode, about 2 minutes)
+| Screen | What it shows or does | Data source |
+| --- | --- | --- |
+| **Accounts** | Total balance, checking, savings, money market and CDs, with status tags (for example Dormant) | Fiserv Account Inquiry, live |
+| **Account details** | Rate, term, maturity, opening deposit, accrued interest, every balance type, 30/60/90-day history | Fiserv Account Inquiry + Transaction History |
+| **Move money › Between your accounts** | Instant transfer between your own accounts | Fiserv Add Transfer |
+| **Move money › To another PSK Bank customer** | Pay Alex, Jordan or Sam; it lands in their checking immediately | Fiserv Add Transfer |
+| **Move money › From another bank** | Link a bank with Plaid and pull money in | Plaid (mock); ACH leg simulated |
+| **Debug** | Live request logs, test accounts, architecture diagram, and how Fiserv, the BFF and Java work | This app |
 
-You need JDK 21+ and Node 20.9+. No Maven or Gradle downloads: the backend builds with plain `javac`.
+Dashboards refresh every 15 seconds while open, so a payment sent from one laptop shows up on the other without a reload.
+
+## Demo customers
+
+| Username | Customer | Accounts (Fiserv Premier sandbox, Org 999990301) |
+| --- | --- | --- |
+| `alex` | Alex Morgan | Everyday Checking ••2605, Money Market ••1916, 12-Month CD ••8135 |
+| `jordan` | Jordan Lee | Everyday Checking ••7791, High-Yield Savings ••0518, 6-Month CD ••3060 |
+| `sam` | Sam Patel | Everyday Checking ••3267, Bills Checking ••4258, 3-Month CD ••1702 |
+
+All nine are real accounts in the shared sandbox. Locally the password is `DEMO_PASSWORD` in `web/.env.local`; on Render it's
+the one `deploy/render-deploy.sh` printed. Signed-in users can also find it under **Debug › Test accounts**.
+
+**Team demo:** each person signs in as a different customer, opens Move money, and sends a few dollars to someone else.
+The recipient sees the new balance, a "Received" line and the Fiserv transaction within 15 seconds.
+
+## Run it locally
+
+You need JDK 21+ and Node 20.9+. The backend builds with plain `javac`; there's no Maven or Gradle.
 
 ```bash
 # terminal 1: Java service on :8081
 cd backend
-./run.sh                 # Windows: run.cmd   (creates backend/.env from .env.example)
+./run.sh                 # Windows: run.cmd. Creates backend/.env from .env.example (mock mode) on first run.
 
 # terminal 2: Next.js on :3000
 cd web
@@ -32,122 +59,134 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000 and sign in as `alex` with the demo password from `web/.env.local`.
+Open http://localhost:3000 and sign in as `alex`, `jordan` or `sam`.
 
-Try these:
+Out of the box both Fiserv and Plaid run in **mock** mode, so everything works offline. To let other laptops on the same
+Wi-Fi join, open `http://<this machine's IP>:3000` on them. For people elsewhere, run a tunnel such as
+`cloudflared tunnel --url http://localhost:3000`.
 
-1. **Link a bank** on the dashboard. Mock Plaid links "First Platypus Bank".
-2. **Move money**: transfer between your accounts (Fiserv Add Transfer), or pull from the linked bank (Plaid verify plus simulated ACH).
-3. Open an account to see its transaction history (Fiserv Account Transaction History).
-4. **Simulate Fiserv outage** in the footer. You get cached balances, a clear banner, transfers paused and the circuit open. End it to recover.
+### Use the live Fiserv sandbox
 
-## Deploy free on Render
-
-`render.yaml` defines both services (free plan): `psk-bank-api` (Java, Docker) and `psk-bank-online` (Next.js).
-
-1. Push this repo to GitHub.
-2. In Render: **New → Blueprint**, pick the repo, then fill in the values it asks for:
-   `FISERV_API_KEY`, `FISERV_API_SECRET`, `DEMO_PASSWORD`, and `BACKEND_URL` (the API service's URL, e.g. `https://psk-bank-api.onrender.com`).
-   The shared secret and session secret are generated for you.
-3. Open the `psk-bank-online` URL and sign in as `alex`, `jordan` or `sam`.
-
-Free services sleep after about 15 minutes idle; the first visit after that takes 30–60 seconds while both wake up.
-Open the site a minute before a demo. In-memory data (logs, activity, rate limits) resets when they sleep.
-
-## Switch Fiserv to live (your Developer Studio workspace)
-
-1. In Developer Studio, open **Workspaces → your Banking Hub workspace → Credentials**. Copy the **API key**, **API secret**, **Org ID** and **Host URL**.
+1. In Fiserv Developer Studio, open your Banking Hub workspace and copy the **API key**, **API secret**, **Org ID** and **Host URL**.
 2. Edit `backend/.env`:
    ```ini
    FISERV_MODE=live
    FISERV_API_KEY=...
    FISERV_API_SECRET=...
-   FISERV_ORG_ID=...
-   FISERV_HOST_URL=https://bankinghub-cert.fiservapis.com/banking/efx/v1   # use the Host URL shown on your key
+   FISERV_ORG_ID=999990301
+   FISERV_HOST_URL=https://bankinghub-cert.fiservapis.com/banking/efx/v1
    ```
-3. Point `FISERV_DEMO_ACCOUNTS` at accounts that exist in the sandbox. The Trial plan is the **shared Premier sandbox**. Sample `AcctId`s are in the Banking Hub **Resources → Postman collection**.
+3. Point each customer at accounts that exist in the sandbox (Banking Hub › Resources › Postman collection lists samples):
    ```ini
-   FISERV_DEMO_ACCOUNTS=SDA:<acctId>:Savings;CDA:<acctId>:My CD;LOAN:<acctId>:Mortgage
+   DEMO_USERS=u-alex:Alex Morgan,u-jordan:Jordan Lee,u-sam:Sam Patel
+   ACCOUNTS_u-alex=DDA:1081372605:Everyday Checking;SDA:8282801916:Money Market;CDA:1082998135:12-Month CD
    ```
-4. Smoke-test before starting the UI:
+   Types: `DDA` checking, `SDA` savings, `CDA` CD. Web logins live in `web/.env.local` as `DEMO_USERS=alex:u-alex:Alex Morgan,...`.
+4. Check every account before starting the UI:
    ```bash
    cd backend && ./run.sh --check
    # Token OK, expires in ~898s
-   #   SDA   ••1234  OK  available=... current=... provider=Premier
+   #   DDA   ••2605  OK  available=63594.93 ...
    ```
-   A `REJECTED ... EFX 1120`-style line means the account id or type isn't in the sandbox. The token step failing means the key, secret or token URL is wrong.
-5. `./run.sh`, then reload the web app. The footer's Fiserv chip now says **live**.
+   `REJECTED ... 1120` means the account number or type isn't in the sandbox. A token failure means the key, secret or token URL is wrong.
 
-Keep `backend/.env` out of Git. It is already in `.gitignore`.
+### Use the Plaid sandbox
 
-## Switch Plaid to live (Plaid Sandbox)
+Set `PLAID_MODE=live`, `PLAID_ENV=sandbox`, `PLAID_CLIENT_ID` and `PLAID_SECRET` in `backend/.env`. **Link a bank** then
+opens real Plaid Link (sandbox login `user_good` / `pass_good`).
 
-```ini
-PLAID_MODE=live
-PLAID_ENV=sandbox
-PLAID_CLIENT_ID=...       # Plaid Dashboard → Developers → Keys
-PLAID_SECRET=...          # the Sandbox secret
+## Deploy free on Render
+
+`render.yaml` and `deploy/render-deploy.sh` define two free web services: `psk-bank-api` (Java, Docker) and `psk-bank-online` (Next.js).
+
+```bash
+deploy/render-deploy.sh              # first deploy: asks for a Render API key, reads Fiserv keys from backend/.env,
+                                     # generates the shared and session secrets plus a demo password
+deploy/render-deploy.sh --redeploy   # rebuild both from the latest main; same URLs, settings and password
 ```
 
-**Link a bank** now opens real Plaid Link (sandbox login `user_good` / `pass_good`). The access token is exchanged and stored in Java only.
+Create the API key in the Render dashboard under **Account settings › API Keys**. The services were created through the API,
+so pushes don't auto-deploy; run `--redeploy` after you push. Free services sleep after about 15 idle minutes, and the
+in-memory data (logs, activity, rate limits) resets when they do. Balances and history live in Fiserv and are unaffected.
 
-## What is real vs simulated
+## What is real and what is simulated
 
 | Capability | Fiserv / Plaid call | In this demo |
 | --- | --- | --- |
-| Account balances, rate, maturity | `POST /acctservice/acctmgmt/accounts/secured` | Real in live mode |
-| Transaction history | `POST /accttranservice/acctmgmt/acctTrn/secured` | Real in live mode |
-| Transfer between own accounts | `POST /xferservice/payments/transfers` | Real in live mode |
-| Link external bank, balances | Plaid `/link/token/create`, `/item/public_token/exchange`, `/accounts/balance/get` | Real in live mode |
-| Verify ACH numbers | Plaid `/auth/get` | Real in live mode |
-| **ACH pull from external bank** | none in the Banking Hub Premier API set | **Simulated**, labelled in the UI. Production sends it to your ACH originator; the core is credited on settlement. |
-| Customer login | none | Demo username/password. Production uses OIDC with your IdP plus MFA. |
-| Storage (Plaid tokens, idempotency, audit) | none | In memory. Production uses encrypted DB/KMS and an append-only audit store. |
+| Balances, rate, term, maturity, interest | `POST /acctservice/acctmgmt/accounts/secured` | Real |
+| Transaction history | `POST /accttranservice/acctmgmt/acctTrn/secured` | Real |
+| Transfer between own accounts, or to another PSK customer | `POST /xferservice/payments/transfers` | Real (immediate, `ExpediteInd` + transaction codes) |
+| Link an external bank, its balances, ACH numbers | Plaid Link, `/accounts/balance/get`, `/auth/get` | Mock (real with Plaid keys) |
+| **ACH pull from another bank** | None in the Banking Hub Premier API set | **Simulated** and labelled in the UI |
+| **Payments to other banks (wire, RTP, FedNow, ACH out)** | Separate Fiserv payment products | Not built yet |
+| Customer login | None | Demo username and password; production uses OIDC with MFA |
+| Idempotency keys, audit, logs, rate limits | None | In memory; production uses a database and an append-only audit store |
 
-Banking Hub request rules this code follows (from the Developer Studio docs): every call is `POST`/`PUT`. Reads use `/secured` paths so account numbers never appear in URLs. Each call carries `Authorization: Bearer <token>` and an `EFXHeader` header with JSON (`OrganizationId` required). Tokens come from `POST /fts-apim/oauth2/v2` with Basic auth (API key and secret) and last about 15 minutes, and `expires_in` is in **milliseconds**.
+`docs/money-movement.html` is a team briefing on how money moves between banks, who is responsible at each step, and what
+a new bank needs beyond these core APIs.
 
-## Security built into the demo
+## Built-in safeguards
 
-- Session: HMAC-signed, `HttpOnly`, `SameSite=Lax`, `Secure` in production, 15-minute lifetime.
-- CSRF: the token is bound into the signed session and checked on every BFF mutation, plus an Origin check.
-- Entitlements: the Java service maps the session user to allowed accounts and checks on **every** call. The browser only sees opaque ids (`acc-1`) and masked numbers.
-- Java trusts only the BFF: shared secret (constant-time compare) and a user id header. It binds to `127.0.0.1` by default.
-- Money movement: an `Idempotency-Key` per intended transfer, in-flight de-duplication, no automatic retry on timeout ("unknown" rather than "failed"), per-transfer limits, and an audit line for every attempt.
-- Resilience: timeouts, a circuit breaker (3 failures, then 30s fail-fast), and a last-good read model with a stale banner.
-- Headers: CSP (allows Plaid's CDN only), HSTS, `X-Frame-Options: DENY`, `nosniff`.
+**Security**
+- Session cookie: HMAC-signed, `HttpOnly`, `SameSite=Lax`, `Secure` in production, 15-minute lifetime.
+- CSRF token bound into the session plus an Origin check on every change.
+- Entitlements are checked in Java on every call. The browser sees opaque ids (`acc-1`) and masked numbers only, and payees by name, never by account number.
+- Java trusts only the BFF: a shared secret compared in constant time, plus the user id header. It refuses to start exposed with the default secret.
+- Headers: CSP (Plaid's CDN only), HSTS, `X-Frame-Options: DENY`, `nosniff`.
 
-## Verify the live transports without real keys
+**Money movement**
+- An `Idempotency-Key` per intended transfer, in-flight de-duplication (409), and no automatic retry on timeout (reported as unknown).
+- Limits: $25,000 between your own accounts; $5,000 per payment and $10,000 a day to other customers; 6 transfers per minute.
+- Funds are re-checked against a fresh Fiserv read before every transfer. Dormant or closed accounts can't send or receive.
+- An audit line for every attempt, on both sides of a payment.
+
+**Resilience under load**
+- Timeouts, and a circuit breaker (3 failures, then 30s fail-fast) with last-known balances and transfers paused.
+- At most 4 Fiserv calls in flight; identical reads in flight are shared; reads are cached for 60s; a 429 falls back to the last good reply.
+- Tested against the live sandbox: 30 concurrent dashboards all succeeded, 3 identical transfers moved money once, and a burst of 8 transfers was capped at the limit.
+
+## Tests
 
 ```bash
 backend/test/contract-test.sh     # needs python3 + curl
 ```
 
-This starts local fakes that **reject** anything off-contract (wrong token auth, missing or invalid EFXHeader, wrong Plaid keys or version). It then runs the Java service in live mode against them and checks the mappings. Expected result: `7 passed, 0 failed`.
+Local fakes reject anything off-contract (token auth, EFXHeader, EFX bodies, Plaid keys and version), and the Java service
+runs in live mode against them. Current result: 6 of 7 pass; the Plaid auth + funding check fails and is a known gap.
+`./run.sh --check` is the live smoke test; `java -cp out com.pskbank.demo.core.RateLimiter` self-checks the rate limiter.
 
 ## Project map
 
 ```
-backend/                         Java 21, zero dependencies
+backend/                          Java 21, no dependencies
+  Dockerfile                      image for Render (compiles at build time)
   src/main/java/com/pskbank/demo/
-    App.java                     wiring, routes, error mapping, --check
-    fiserv/  LiveFiservTransport (token + EFXHeader), MockFiservTransport (Premier-like core),
-             EfxMapper (EFX <-> domain), FiservPaths
+    App.java                      wiring, routes, error mapping, --check
+    core/    Router, Json, Config, HttpJson, CircuitBreaker, RateLimiter, Trace
+    fiserv/  LiveFiservTransport (token + EFXHeader), MockFiservTransport, EfxMapper, FiservPaths
+    banking/ Entitlements, CoreBankingService (cache, coalescing, gate), TransferService,
+             ExternalFundingService, AuditLog, Models
     plaid/   LivePlaidTransport, MockPlaidTransport, PlaidService
-    banking/ Entitlements, CoreBankingService (breaker + cache), TransferService,
-             ExternalFundingService, AuditLog
-    core/    Router (JDK HttpServer), Json, Config, CircuitBreaker, HttpJson
-  test/contract-test.sh          live-transport contract test
-web/                             Next.js 16 App Router
-  app/api/**/route.ts            BFF route handlers (guarded, whitelisted fields, relay to Java)
-  lib/session.ts, bff.ts         signed session, CSRF + origin guard
-  lib/backend.ts                 the BFF's only outbound client (Java service)
-  app/page.tsx, move-money/, accounts/[id]/   server-rendered pages
-  components/                    client islands: forms, Plaid Link, outage toggle
+  test/contract-test.sh           live-transport contract test
+web/                              Next.js 16 App Router
+  proxy.ts                        request id for end-to-end tracing
+  app/page.tsx, accounts/, move-money/, login/, debug/   server-rendered pages
+  app/api/**/route.ts             BFF route handlers (guarded, whitelisted fields, relayed to Java)
+  lib/backend.ts                  the BFF's only outbound client
+  lib/forward.ts, bff.ts          session, origin and CSRF guard
+  lib/session.ts, demoUsers.ts    signed session, demo sign-in list
+  lib/trace.ts, apiCatalog.ts     Debug › Logs data and plain-English call descriptions
+  components/                     forms, log explorer, Debug tabs, logo
+deploy/render-deploy.sh           one-command Render deploy and redeploy
+render.yaml                       Render Blueprint (alternative to the script)
+docs/money-movement.html          team briefing: how money moves between banks
 ```
 
-## Moving to the production stack
+## Moving to production
 
-- **Spring Boot**: each Java class maps across one-to-one. `Router` becomes `@RestController`, `HttpJson` becomes `RestClient`, `Json` becomes Jackson, `CircuitBreaker` becomes Resilience4j, and `Config` becomes `application.yml` plus Vault.
-- **Identity**: replace `/api/auth/login` with OIDC (authorization code + PKCE) and step-up MFA before money movement.
-- **Data**: Postgres for entitlements and idempotency keys, KMS-encrypted Plaid tokens, an append-only audit table shipped to the SIEM.
-- **Network**: Java on a private subnet, mTLS between BFF and Java, egress allowlist to Fiserv and Plaid hosts only.
+- **Spring Boot:** each Java class maps one-to-one. `Router` becomes `@RestController`, `HttpJson` becomes `RestClient`, `Json` becomes Jackson, `CircuitBreaker` becomes Resilience4j, and `Config` becomes `application.yml` plus Vault.
+- **Identity:** replace the demo login with OIDC (authorization code + PKCE) and step-up MFA before money moves.
+- **Accounts:** load each customer's accounts from an enrollment store linked to their Fiserv party record, instead of settings.
+- **Data:** Postgres for idempotency keys, payment state and daily limits; an append-only audit table shipped to the SIEM; KMS-encrypted Plaid tokens.
+- **Payments to other banks:** Fiserv's payment products (or another ISO 20022 payments hub) for wires, RTP/FedNow and ACH, with sanctions screening and fraud scoring.
+- **Network:** Java on a private subnet, mTLS between the BFF and Java, and an egress allowlist for Fiserv and Plaid.
